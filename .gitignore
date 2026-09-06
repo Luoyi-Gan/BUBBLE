@@ -1,0 +1,41 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.pytest_cache/
+
+# Secrets / local env
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# LaTeX build
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+paper/_build/
+
+# Large / generated (commit small CSVs in output/ if needed)
+data/raw/*
+!data/raw/.gitkeep
+*.zip
+*.rar
+*.7z
+
+# Jupyter / plots caches
+.mypy_cache/
