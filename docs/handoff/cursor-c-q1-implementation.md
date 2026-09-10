@@ -72,7 +72,24 @@ E_0=E_{144}=6000,\quad g_t,s_t\ge0.
 - 在 `output/q1_validation.md` 中记录“内部索引 \(t\) → 附件1第 \(t\)条数据 → 模板第 \(t\)条时间标签”的映射说明；不要伪造额外时间区间。
 - 若该行序映射导致对题意理解的实质冲突，停止导出并报告给 Codex/队长。
 
-## 6. 可选工作（主结果验收后再做）
+## 6. 必做内部模型对照（主结果验收后、正式导出前）
+
+在同一份清洗后的输入数据上运行以下四种情形：
+
+| 编号 | 求解形式 | 目标 |
+|---|---|---|
+| M1 | LP，不设互斥二元变量 | 最小购电费 |
+| M2 | LP，不设互斥二元变量 | 先最小购电费，再在成本容差内最小化 \(Q=\sum_t(c_t+d_t)\) |
+| M3 | MILP，设互斥二元变量 | 最小购电费 |
+| M4 | MILP，设互斥二元变量 | 先最小购电费，再在成本容差内最小化 \(Q\) |
+
+- M3/M4 加入 \(z_t\in\{0,1\}\)、\(c_t\le833.333333z_t\)、\(d_t\le833.333333(1-z_t)\)。
+- M2/M4 必须先保存第一阶段最优成本 \(C^*\)，再加 \(\sum_tp_tg_t\le C^*+\varepsilon_C\) 后最小化 \(Q\)。不得用未经说明的微小加权项替代词典序求解。
+- 输出 `output/q1_model_comparison.csv`：`case, solver, purchase_cost_yuan, grid_purchase_kwh, curtailment_kwh, throughput_kwh, max_simultaneous_charge_discharge, soc_min_kwh, soc_max_kwh, max_balance_residual_kwh, solve_seconds, pass`。
+- 输出 `output/q1_model_selection.md`：说明成本容差 \(\varepsilon_C\)、四种情形的约束检查、推荐方案和理由。
+- 不要让 M1/M3/M4 覆盖正式结果；正式 `output/result1.xlsx` 暂按 M2 生成，交由 Codex 验收后定稿。
+
+## 7. 可选工作（四种模型对照完成后再做）
 
 - 效率敏感性 B：\(\eta_c=\eta_d=0.90\)，对应往返效率 81%。不得覆盖主方案输出。
 - SOC 离散动态规划交叉验证；记录 SOC 网格精度及与 LP 的目标差异。
