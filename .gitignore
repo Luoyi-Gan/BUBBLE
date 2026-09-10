@@ -40,3 +40,5 @@ data/raw/*
 # Jupyter / plots caches
 .mypy_cache/
 .mplconfig/
+output/q2_full_linked/dispatch_daily/
+output/q2_full_linked/forecast_archive.csv

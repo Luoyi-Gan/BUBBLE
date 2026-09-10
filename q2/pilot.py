@@ -642,6 +642,118 @@ def run_linked_warmup(
     return frame, value_audits
 
 
+def run_full_linked_policy(
+    data: Q2Data,
+    archive: ForecastArchive,
+    output_dir: Path,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Run the deployable policy in one causal state path for all 365 days.
+
+    At every 14-day boundary, only states and realised trajectories from prior
+    days have been written to ``policy_day_start_soc``.  Thus the K score,
+    frozen K, day-ahead plan and realised MPC actions share one SOC history.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+    dispatch_dir = output_dir / "dispatch_daily"
+    dispatch_dir.mkdir(parents=True, exist_ok=True)
+    policy_day_start_soc = np.full(len(data.dates), np.nan)
+    daily_k = np.ones(len(data.dates), dtype=int)
+    daily_rows: list[dict] = []
+    calendar_rows: list[dict] = []
+    value_audits: list[dict] = []
+    soc = E_INITIAL_KWH
+
+    for calibration in range(0, len(data.dates), 14):
+        effective_end = min(calibration + 13, len(data.dates) - 1)
+        if calibration < 2:
+            selected_k = 1
+            candidate_rows = [
+                {
+                    "candidate_k": 1,
+                    "validation_days": 0,
+                    "mean_validation_cost_yuan": np.nan,
+                    "standard_error_yuan": np.nan,
+                    "emergency_purchase_kwh": np.nan,
+                    "mean_solve_seconds": np.nan,
+                    "within_time_limit": True,
+                    "selected": True,
+                }
+            ]
+            fallback = "no_complete_prior_residual_pool"
+        else:
+            choice = select_dynamic_k(data, archive, policy_day_start_soc, calibration)
+            selected_k = choice.selected_k
+            candidate_rows = list(choice.rows)
+            fallback = "K=1_early_pool_fallback" if selected_k == 1 else ""
+        daily_k[calibration : effective_end + 1] = selected_k
+        for candidate in candidate_rows:
+            calendar_rows.append(
+                {
+                    "calibration_date": data.dates[calibration].strftime("%Y-%m-%d"),
+                    "history_cutoff_date": (
+                        data.dates[calibration - 1].strftime("%Y-%m-%d")
+                        if calibration else "none"
+                    ),
+                    "candidate_k": int(candidate["candidate_k"]),
+                    "selected_k": selected_k,
+                    "effective_start_date": data.dates[calibration].strftime("%Y-%m-%d"),
+                    "effective_end_date": data.dates[effective_end].strftime("%Y-%m-%d"),
+                    "mean_validation_cost_yuan": candidate["mean_validation_cost_yuan"],
+                    "standard_error_yuan": candidate["standard_error_yuan"],
+                    "validation_days": candidate["validation_days"],
+                    "emergency_purchase_kwh": candidate["emergency_purchase_kwh"],
+                    "mean_solve_seconds": candidate["mean_solve_seconds"],
+                    "within_time_limit": candidate["within_time_limit"],
+                    "candidate_selected": bool(candidate["selected"]),
+                    "selected": bool(candidate["selected"]),
+                    "fallback_reason": fallback,
+                }
+            )
+
+        for i in range(calibration, effective_end + 1):
+            policy_day_start_soc[i] = soc
+            k = int(daily_k[i])
+            if i == 0:
+                day_choice = None
+            else:
+                day_choice = KChoice(i, k, build_scenarios(i, data, archive, k), ())
+            cuts, cut_rows = build_next_day_value_cuts(data, archive, i, k)
+            value_audits.extend(
+                {"decision_date": data.dates[i].strftime("%Y-%m-%d"), **row}
+                for row in cut_rows
+            )
+            path = dispatch_dir / f"dispatch_{data.dates[i].strftime('%Y-%m-%d')}.csv"
+            result = run_posterior_mpc(
+                data,
+                archive,
+                day_choice,
+                soc,
+                path=path,
+                terminal_value_cuts=cuts,
+                variant="full_linked_48h",
+            )
+            if not result["pass"]:
+                raise AssertionError(f"full linked policy failed on {result['date']}")
+            daily_rows.append(result)
+            soc = float(result["soc_end_kwh"])
+
+    daily = pd.DataFrame(daily_rows)
+    calendar = pd.DataFrame(calendar_rows)
+    value_audit = pd.DataFrame(value_audits)
+    if len(daily) != len(data.dates) or not daily["pass"].all():
+        raise AssertionError("full linked policy does not cover every day")
+    continuity = np.abs(
+        daily["soc_start_kwh"].to_numpy()[1:]
+        - daily["soc_end_kwh"].to_numpy()[:-1]
+    )
+    if np.max(continuity) >= NUMERIC_TOL:
+        raise AssertionError("full linked policy SOC is not continuous")
+    daily.to_csv(output_dir / "daily_summary.csv", index=False)
+    calendar.to_csv(output_dir / "k_freeze_calendar.csv", index=False)
+    value_audit.to_csv(output_dir / "next_day_value_audit.csv", index=False)
+    return daily, calendar, value_audit
+
+
 def write_pilot_figures(data: Q2Data, summaries: list[dict]) -> None:
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     plt.rcParams["axes.unicode_minus"] = False
@@ -815,4 +927,3 @@ def write_validation_report(
         "- 未生成或修改 `result2.xlsx`。",
     ]
     path_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
-

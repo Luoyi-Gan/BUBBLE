@@ -14,6 +14,7 @@ ATTACH_DIR = Path(
 ATTACH1 = ATTACH_DIR / "附件1.xlsx"
 ATTACH2 = ATTACH_DIR / "附件2.xlsx"
 OUTPUT_DIR = ROOT / "output" / "q2_pilot"
+FULL_OUTPUT_DIR = ROOT / "output" / "q2_full_linked"
 FIG_DIR = ROOT / "fig" / "q2_pilot"
 
 T = 144
@@ -37,7 +38,9 @@ RESIDUAL_POOL_DAYS = 28
 K_CANDIDATES = (2, 4, 6, 8, 10, 12)
 K_VALIDATION_DAYS = 14
 K_RECALIBRATION_DAYS = 14
-T_MAX_SECONDS: float | None = None  # unresolved; pilot reports timing without filtering
+# Fixed from the R1--R4 timing audit: a validation-day score must be obtained
+# within this budget before its K is eligible under the one-standard-error rule.
+T_MAX_SECONDS: float | None = 0.20
 MPC_COST_TOL = 1e-7
 NEXT_DAY_VALUE_GAP_TOL_YUAN = 1.0
 NEXT_DAY_VALUE_MAX_SAMPLES = 25
@@ -45,4 +48,3 @@ NUMERIC_TOL = 1e-6
 SIMULTANEOUS_CD_TOL = 1e-4
 SOLVER = "HIGHS"
 PILOT_DATES = ("2025-02-01", "2025-06-21")
-

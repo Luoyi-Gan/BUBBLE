@@ -1,0 +1,11 @@
+{
+  "main_linked_total_cost_yuan": 16389681.53809892,
+  "no_storage_total_cost_yuan": 21306389.9267752,
+  "perfect_information_total_cost_yuan": 13288662.366590962,
+  "linked_minus_no_storage_yuan": -4916708.388676278,
+  "linked_minus_perfect_information_yuan": 3101019.1715079583,
+  "main_start_soc_kwh": 6000.0,
+  "main_terminal_soc_kwh": 1200.0,
+  "perfect_terminal_soc_kwh": 1200.0,
+  "comparison_note": "The no-storage baseline is not SOC-comparable because it has no initial stored energy; use it only as an operational benchmark, not as a pure storage-value claim."
+}

@@ -30,8 +30,23 @@ python q2/validate_q2_pilot.py
 - `output/q2_pilot/validation.json`、`validation.md`
 - `fig/q2_pilot/`
 
-本流程只验证 P0–P4/R1–R4，不创建或修改 `result2.xlsx`。合同 `x<=q` 与
-`T_max` 仍待签收，配置集中在 `q2/config.py`。48 小时价值采用带弦线—切面
+本流程只验证 P0–P4/R1–R4，不创建或修改 `result2.xlsx`。48 小时价值采用带弦线—切面
 误差证书的自适应次日随机 LP 对偶切面，并单列有/无该价值的两日试算对比。P1 当前是跨日
 SOC 连续的逐日完美信息比较器；由于它和待定的 48 小时主方案视域不同，
 暂不将其宣称为严格的全局下界。
+
+## 全年联动计算
+
+日前普通购电采用预购额度 \(q\)：当前时段实际取用满足 \(x\le q\)，未用额度仍按 \(q\)
+计费。低价时段的提前准备只能表现为“普通购电—充电—SOC—后续放电”；未来额度不能倒借。
+紧急购电只补足当前实际缺口，按 \(5p\) 计费。
+
+```bash
+python q2/run_q2_full.py
+python q2/run_q2_comparators.py
+```
+
+`run_q2_full.py` 每 14 日仅用此前主策略已执行的 SOC 轨迹评分并冻结 K，顺序运行全年的
+日前计划与日内 MPC。它输出到 `output/q2_full_linked/`，仍不会生成 `result2.xlsx`。
+`run_q2_comparators.py` 随后计算无储能联动基线和逐日完美信息比较器。完整年度结果的解释和
+物理审计见 `docs/reviews/q2-full-linked-audit.md`。
