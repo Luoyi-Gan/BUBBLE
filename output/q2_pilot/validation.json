@@ -1,0 +1,68 @@
+{
+  "status": "pass",
+  "perfect_information": {
+    "days": 365,
+    "all_days_pass": true,
+    "max_balance_residual_kwh": 2.273736754432321e-13,
+    "emergency_purchase_kwh": 0.0,
+    "max_cross_day_soc_gap_kwh": 0.0,
+    "max_simultaneous_cd_kwh2": 0.0
+  },
+  "pilot_days": [
+    {
+      "date": "2025-02-01",
+      "selected_k": 4,
+      "planned_cost_yuan": 21074.34857067041,
+      "emergency_cost_yuan": 1307.4686003602053,
+      "total_cost_yuan": 22381.817171030612,
+      "planned_q_kwh": 40810.84714827769,
+      "actual_x_kwh": 37394.598243358094,
+      "unused_plan_kwh": 3416.248904919591,
+      "emergency_kwh": 383.1439442104979,
+      "curtailment_kwh": 1506.7841009525162,
+      "soc_start_kwh": 1200.0,
+      "soc_end_kwh": 1237.5711761691139,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "max_x_minus_q_kwh": 0.0,
+      "mean_mpc_solve_seconds": 0.007998022876563482,
+      "total_mpc_solve_seconds": 1.1517152942251414,
+      "estimated_334_day_runtime_hours": 0.10685358563088812,
+      "pass": true
+    },
+    {
+      "date": "2025-06-21",
+      "selected_k": 2,
+      "planned_cost_yuan": 21708.020824269774,
+      "emergency_cost_yuan": 97.29197475258209,
+      "total_cost_yuan": 21805.312799022355,
+      "planned_q_kwh": 37436.16768831824,
+      "actual_x_kwh": 32402.087453803935,
+      "unused_plan_kwh": 5034.0802345143065,
+      "emergency_kwh": 41.48590148990146,
+      "curtailment_kwh": 11863.11954088282,
+      "soc_start_kwh": 1200.0,
+      "soc_end_kwh": 1272.9485159163514,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "max_x_minus_q_kwh": 0.0,
+      "mean_mpc_solve_seconds": 0.008067940353511303,
+      "total_mpc_solve_seconds": 1.1617834109056275,
+      "estimated_334_day_runtime_hours": 0.107787683122911,
+      "pass": true
+    }
+  ],
+  "contract_audit": {
+    "normal_cost_uses": "sum(price_t * planned_q_t)",
+    "emergency_cost_uses": "sum(5 * price_t * emergency_t)",
+    "actual_normal_purchase_constraint": "0 <= x_t <= q_t",
+    "q_locked_during_day": true
+  },
+  "output_guard": "No result2.xlsx is created or modified by the pilot.",
+  "open_items": [
+    "x<=q contract semantics await captain sign-off",
+    "48-hour terminal value is not included in this two-day pilot",
+    "T_max is not yet specified; timings are reported without K filtering",
+    "pilot day initial SOC comes from the perfect-information continuous path"
+  ]
+}
