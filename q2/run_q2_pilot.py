@@ -21,14 +21,18 @@ from q2.forecast import (  # noqa: E402
     write_forecast_archive,
 )
 from q2.pilot import (  # noqa: E402
+    KChoice,
+    build_k_freeze_calendar,
+    build_next_day_value_cuts,
+    run_linked_warmup,
     run_perfect_information,
     run_posterior_mpc,
-    select_dynamic_k,
+    write_k_freeze_calendar,
     write_k_audit,
     write_pilot_figures,
     write_validation_report,
 )
-from q2.scenarios import write_scenarios_csv  # noqa: E402
+from q2.scenarios import build_scenarios, write_scenarios_csv  # noqa: E402
 
 
 def main() -> None:
@@ -55,13 +59,29 @@ def main() -> None:
     )
     print("P2 complete: causal forecast archive")
 
+    calendar = build_k_freeze_calendar(data, archive, day_start_soc)
+    write_k_freeze_calendar(OUTPUT_DIR / "k_freeze_calendar.csv", calendar)
+    print("R4 complete: 14-day K freeze calendar")
+
+    warmup, warmup_value_audit = run_linked_warmup(
+        data, archive, calendar, OUTPUT_DIR / "linked_warmup_daily.csv"
+    )
+    print("R2 complete: January linked-policy warmup")
+
     choices = []
     scenario_rows = []
     for date_text in PILOT_DATES:
         i = int(data.dates.get_loc(pd.Timestamp(date_text)))
-        choice = select_dynamic_k(data, archive, day_start_soc, i)
+        k = int(calendar.daily_k[i])
+        choice = KChoice(i, k, build_scenarios(i, data, archive, k), ())
         choices.append(choice)
-        scenario_rows.extend(choice.rows)
+        calibration_index = (i // 14) * 14
+        scenario_rows.extend(
+            row
+            for row in calendar.rows
+            if row["calibration_date"]
+            == data.dates[calibration_index].strftime("%Y-%m-%d")
+        )
         write_scenarios_csv(
             OUTPUT_DIR / f"scenarios_{date_text}.csv", data, choice.scenarios
         )
@@ -70,18 +90,125 @@ def main() -> None:
     write_k_audit(OUTPUT_DIR / "k_selection_validation.md", choices, data)
 
     summaries = []
+    value_comparisons = []
+    all_value_audits = list(warmup_value_audit)
     for choice in choices:
         date_text = data.dates[choice.target_index].strftime("%Y-%m-%d")
+        if date_text == "2025-02-01":
+            initial_soc = float(warmup["soc_end_kwh"].iloc[-1])
+        else:
+            initial_soc = float(day_start_soc[choice.target_index])
+        cuts, cut_rows = build_next_day_value_cuts(
+            data, archive, choice.target_index, choice.selected_k
+        )
+        all_value_audits.extend(
+            {"decision_date": date_text, **row} for row in cut_rows
+        )
+        without_value = run_posterior_mpc(
+            data,
+            archive,
+            choice,
+            initial_soc,
+            OUTPUT_DIR / f"q2_pilot_dispatch_{date_text}_no48h.csv",
+            terminal_value_cuts=None,
+            variant="without_48h_value",
+        )
         summary = run_posterior_mpc(
             data,
             archive,
             choice,
-            float(day_start_soc[choice.target_index]),
+            initial_soc,
             OUTPUT_DIR / f"q2_pilot_dispatch_{date_text}.csv",
+            terminal_value_cuts=cuts,
+            variant="with_48h_value",
         )
         summaries.append(summary)
+        next_index = choice.target_index + 1
+        next_k = int(calendar.daily_k[next_index])
+        next_choice = KChoice(
+            next_index,
+            next_k,
+            build_scenarios(next_index, data, archive, next_k),
+            (),
+        )
+        next_cuts, next_cut_rows = build_next_day_value_cuts(
+            data, archive, next_index, next_k
+        )
+        all_value_audits.extend(
+            {
+                "decision_date": data.dates[next_index].strftime("%Y-%m-%d"),
+                **row,
+            }
+            for row in next_cut_rows
+        )
+        next_after_without = run_posterior_mpc(
+            data,
+            archive,
+            next_choice,
+            float(without_value["soc_end_kwh"]),
+            path=None,
+            terminal_value_cuts=next_cuts,
+            variant="next_day_after_without_48h_today",
+        )
+        next_after_with = run_posterior_mpc(
+            data,
+            archive,
+            next_choice,
+            float(summary["soc_end_kwh"]),
+            path=None,
+            terminal_value_cuts=next_cuts,
+            variant="next_day_after_with_48h_today",
+        )
+        value_comparisons.append(
+            {
+                "date": date_text,
+                "initial_soc_kwh": initial_soc,
+                "cost_without_48h_yuan": without_value["total_cost_yuan"],
+                "cost_with_48h_yuan": summary["total_cost_yuan"],
+                "cost_difference_yuan": (
+                    summary["total_cost_yuan"] - without_value["total_cost_yuan"]
+                ),
+                "emergency_without_48h_kwh": without_value["emergency_kwh"],
+                "emergency_with_48h_kwh": summary["emergency_kwh"],
+                "emergency_difference_kwh": (
+                    summary["emergency_kwh"] - without_value["emergency_kwh"]
+                ),
+                "soc_end_without_48h_kwh": without_value["soc_end_kwh"],
+                "soc_end_with_48h_kwh": summary["soc_end_kwh"],
+                "soc_end_difference_kwh": (
+                    summary["soc_end_kwh"] - without_value["soc_end_kwh"]
+                ),
+                "virtual_next_day_value_billed_today": False,
+                "next_day_cost_after_without_48h_yuan": next_after_without[
+                    "total_cost_yuan"
+                ],
+                "next_day_cost_after_with_48h_yuan": next_after_with[
+                    "total_cost_yuan"
+                ],
+                "realized_two_day_cost_without_48h_today_yuan": (
+                    without_value["total_cost_yuan"]
+                    + next_after_without["total_cost_yuan"]
+                ),
+                "realized_two_day_cost_with_48h_today_yuan": (
+                    summary["total_cost_yuan"] + next_after_with["total_cost_yuan"]
+                ),
+                "realized_two_day_cost_difference_yuan": (
+                    summary["total_cost_yuan"]
+                    + next_after_with["total_cost_yuan"]
+                    - without_value["total_cost_yuan"]
+                    - next_after_without["total_cost_yuan"]
+                ),
+                "next_day_plan_recomputed_and_billed_once": True,
+            }
+        )
         print(f"P4 {date_text}: pass={summary['pass']}")
     pd.DataFrame(summaries).to_csv(OUTPUT_DIR / "pilot_day_summary.csv", index=False)
+    pd.DataFrame(value_comparisons).to_csv(
+        OUTPUT_DIR / "next_day_value_comparison.csv", index=False
+    )
+    pd.DataFrame(all_value_audits).to_csv(
+        OUTPUT_DIR / "next_day_value_audit.csv", index=False
+    )
     write_pilot_figures(data, summaries)
     write_validation_report(
         OUTPUT_DIR / "validation.json",

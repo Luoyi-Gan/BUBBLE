@@ -20,18 +20,43 @@ class ForecastArchive:
     pv_sources: tuple[tuple[int, ...], ...]
 
 
+def forecast_as_of(
+    data: Q2Data, target_index: int, history_end_exclusive: int
+) -> tuple[np.ndarray, np.ndarray, tuple[int, ...], tuple[int, ...]]:
+    """Forecast target using actual observations with index < history_end_exclusive."""
+    if not 0 <= history_end_exclusive <= target_index:
+        raise ValueError("forecast cutoff must not exceed target date")
+    target = data.dates[target_index]
+    same_weekday = [
+        j
+        for j in range(history_end_exclusive)
+        if data.dates[j].weekday() == target.weekday()
+    ]
+    load_sources = tuple(same_weekday[-LOAD_HISTORY_SAME_WEEKDAY:])
+    pv_sources = tuple(
+        range(max(0, history_end_exclusive - PV_HISTORY_DAYS), history_end_exclusive)
+    )
+    load_hat = (
+        data.load[list(load_sources)].mean(axis=0)
+        if load_sources
+        else data.fallback_load.copy()
+    )
+    pv_hat = (
+        data.pv[list(pv_sources)].mean(axis=0)
+        if pv_sources
+        else data.fallback_pv.copy()
+    )
+    return load_hat, pv_hat, load_sources, pv_sources
+
+
 def build_forecast_archive(data: Q2Data) -> ForecastArchive:
     n = len(data.dates)
     load_hat = np.empty_like(data.load)
     pv_hat = np.empty_like(data.pv)
     load_sources: list[tuple[int, ...]] = []
     pv_sources: list[tuple[int, ...]] = []
-    for i, date in enumerate(data.dates):
-        same_weekday = [j for j in range(i) if data.dates[j].weekday() == date.weekday()]
-        ls = tuple(same_weekday[-LOAD_HISTORY_SAME_WEEKDAY:])
-        ps = tuple(range(max(0, i - PV_HISTORY_DAYS), i))
-        load_hat[i] = data.load[list(ls)].mean(axis=0) if ls else data.fallback_load
-        pv_hat[i] = data.pv[list(ps)].mean(axis=0) if ps else data.fallback_pv
+    for i in range(n):
+        load_hat[i], pv_hat[i], ls, ps = forecast_as_of(data, i, i)
         load_sources.append(ls)
         pv_sources.append(ps)
     return ForecastArchive(

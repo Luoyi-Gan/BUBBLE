@@ -14,6 +14,7 @@ from q2.forecast import ForecastArchive
 @dataclass(frozen=True)
 class ScenarioSet:
     target_index: int
+    history_end_exclusive: int
     pool_indices: np.ndarray
     medoid_indices: np.ndarray
     cluster_labels: np.ndarray
@@ -84,10 +85,12 @@ def build_scenarios(
     data: Q2Data,
     archive: ForecastArchive,
     k: int,
+    history_end_exclusive: int | None = None,
 ) -> ScenarioSet:
-    if target_index <= 0:
+    history_end = target_index if history_end_exclusive is None else history_end_exclusive
+    if history_end <= 0 or history_end > target_index:
         raise ValueError("No historical residual exists for the first date")
-    pool = np.arange(max(0, target_index - RESIDUAL_POOL_DAYS), target_index)
+    pool = np.arange(max(0, history_end - RESIDUAL_POOL_DAYS), history_end)
     lr = archive.load_residual[pool]
     pr = archive.pv_residual[pool]
     distance, sl, sp = residual_distance_matrix(lr, pr, data.price)
@@ -101,6 +104,7 @@ def build_scenarios(
     stress_local = int(np.argmax((net_positive[:, high] * data.price[high]).sum(axis=1)))
     return ScenarioSet(
         target_index=target_index,
+        history_end_exclusive=history_end,
         pool_indices=pool,
         medoid_indices=pool[local_medoids],
         cluster_labels=labels,
@@ -112,12 +116,17 @@ def build_scenarios(
 
 
 def scenario_trajectories(
-    scenarios: ScenarioSet, archive: ForecastArchive
+    scenarios: ScenarioSet,
+    archive: ForecastArchive,
+    base_load: np.ndarray | None = None,
+    base_pv: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     i = scenarios.target_index
     m = scenarios.medoid_indices
-    load = np.maximum(0.0, archive.load_hat[i][None, :] + archive.load_residual[m])
-    pv = np.maximum(0.0, archive.pv_hat[i][None, :] + archive.pv_residual[m])
+    load_hat = archive.load_hat[i] if base_load is None else base_load
+    pv_hat = archive.pv_hat[i] if base_pv is None else base_pv
+    load = np.maximum(0.0, load_hat[None, :] + archive.load_residual[m])
+    pv = np.maximum(0.0, pv_hat[None, :] + archive.pv_residual[m])
     return load, pv
 
 

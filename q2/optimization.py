@@ -29,6 +29,7 @@ class DispatchResult:
     curtailment: np.ndarray
     soc: np.ndarray
     emergency_cost: float
+    terminal_value: float
     solve_seconds: float
     status: str
 
@@ -42,8 +43,38 @@ class PlanResult:
     q: np.ndarray
     planned_cost: float
     expected_emergency_cost: float
+    expected_terminal_value: float
+    initial_soc_marginal: float
     solve_seconds: float
     status: str
+
+
+ValueCut = tuple[float, float, float]  # reference SOC, value, subgradient
+
+
+def evaluate_value_cuts(soc: float, cuts: tuple[ValueCut, ...] | None) -> float:
+    if not cuts:
+        return 0.0
+    return max(
+        0.0,
+        max(
+            value + slope * (soc - reference)
+            for reference, value, slope in cuts
+        ),
+    )
+
+
+def _terminal_value_expression(
+    terminal_soc: cp.Expression, cuts: tuple[ValueCut, ...] | None
+) -> tuple[cp.Variable | None, list[cp.Constraint]]:
+    if not cuts:
+        return None, []
+    value = cp.Variable(nonneg=True)
+    constraints = [
+        value >= cut_value + slope * (terminal_soc - reference_soc)
+        for reference_soc, cut_value, slope in cuts
+    ]
+    return value, constraints
 
 
 def _contract_constraints(x: cp.Variable, q: cp.Variable | np.ndarray) -> list[cp.Constraint]:
@@ -104,6 +135,7 @@ def solve_perfect_information_day(
         curtailment=np.asarray(w.value).ravel(),
         soc=np.asarray(E.value).ravel(),
         emergency_cost=float(EMERGENCY_PRICE_MULTIPLIER * price @ e.value),
+        terminal_value=0.0,
         solve_seconds=elapsed,
         status=str(problem.status),
     )
@@ -115,16 +147,19 @@ def solve_stochastic_plan(
     scenario_pv: np.ndarray,
     probabilities: np.ndarray,
     initial_soc: float,
+    terminal_value_cuts: tuple[ValueCut, ...] | None = None,
 ) -> PlanResult:
     k, n = scenario_load.shape
     q = cp.Variable(n, nonneg=True)
     expected_emergency = 0
+    expected_terminal_value: cp.Expression | float = 0.0
     constraints: list[cp.Constraint] = []
+    initial_constraints: list[cp.Constraint] = []
     for omega in range(k):
         x, e, c, d, w = (cp.Variable(n, nonneg=True) for _ in range(5))
         E = cp.Variable(n + 1)
         constraints += _contract_constraints(x, q)
-        constraints += _physical_constraints(
+        physical = _physical_constraints(
             scenario_load[omega],
             scenario_pv[omega],
             initial_soc,
@@ -135,21 +170,42 @@ def solve_stochastic_plan(
             w,
             E,
         )
+        constraints += physical
+        initial_constraints.append(physical[0])
+        terminal_value, terminal_constraints = _terminal_value_expression(
+            E[-1], terminal_value_cuts
+        )
+        constraints += terminal_constraints
+        if terminal_value is not None:
+            expected_terminal_value += probabilities[omega] * terminal_value
         expected_emergency += (
             probabilities[omega] * EMERGENCY_PRICE_MULTIPLIER * price @ e
         )
     planned_cost = _planned_normal_cost(price, q)
-    problem = cp.Problem(cp.Minimize(planned_cost + expected_emergency), constraints)
+    problem = cp.Problem(
+        cp.Minimize(planned_cost + expected_emergency + expected_terminal_value),
+        constraints,
+    )
     started = perf_counter()
     problem.solve(solver=SOLVER, verbose=False)
     elapsed = perf_counter() - started
     if q.value is None:
         raise RuntimeError(f"stochastic plan LP failed: {problem.status}")
     qv = np.asarray(q.value).ravel()
+    marginal = -float(
+        sum(float(np.asarray(constraint.dual_value)) for constraint in initial_constraints)
+    )
+    terminal_value_result = (
+        float(expected_terminal_value.value)
+        if isinstance(expected_terminal_value, cp.Expression)
+        else float(expected_terminal_value)
+    )
     return PlanResult(
         q=qv,
         planned_cost=float(price @ qv),
-        expected_emergency_cost=float(problem.value - price @ qv),
+        expected_emergency_cost=float(problem.value - price @ qv - terminal_value_result),
+        expected_terminal_value=terminal_value_result,
+        initial_soc_marginal=marginal,
         solve_seconds=elapsed,
         status=str(problem.status),
     )
@@ -162,6 +218,7 @@ def solve_fixed_plan_dispatch(
     pv: np.ndarray,
     initial_soc: float,
     throughput_tiebreak: bool = True,
+    terminal_value_cuts: tuple[ValueCut, ...] | None = None,
 ) -> DispatchResult:
     n = len(load)
     x, e, c, d, w = (cp.Variable(n, nonneg=True) for _ in range(5))
@@ -169,17 +226,22 @@ def solve_fixed_plan_dispatch(
     constraints = _contract_constraints(x, q)
     constraints += _physical_constraints(load, pv, initial_soc, x, e, c, d, w, E)
     emergency_cost = EMERGENCY_PRICE_MULTIPLIER * price @ e
-    first = cp.Problem(cp.Minimize(emergency_cost), constraints)
+    terminal_value, terminal_constraints = _terminal_value_expression(
+        E[-1], terminal_value_cuts
+    )
+    constraints += terminal_constraints
+    primary = emergency_cost + (terminal_value if terminal_value is not None else 0.0)
+    first = cp.Problem(cp.Minimize(primary), constraints)
     started = perf_counter()
     first.solve(solver=SOLVER, verbose=False)
     if e.value is None:
         raise RuntimeError(f"fixed-plan execution LP failed: {first.status}")
-    emergency_opt = float(emergency_cost.value)
+    primary_opt = float(primary.value)
     status = str(first.status)
     if throughput_tiebreak:
         second = cp.Problem(
             cp.Minimize(cp.sum(c + d)),
-            constraints + [emergency_cost <= emergency_opt + MPC_COST_TOL],
+            constraints + [primary <= primary_opt + MPC_COST_TOL],
         )
         second.solve(solver=SOLVER, verbose=False)
         if x.value is None:
@@ -194,6 +256,7 @@ def solve_fixed_plan_dispatch(
         curtailment=np.asarray(w.value).ravel(),
         soc=np.asarray(E.value).ravel(),
         emergency_cost=float(EMERGENCY_PRICE_MULTIPLIER * price @ e.value),
+        terminal_value=evaluate_value_cuts(float(E.value[-1]), terminal_value_cuts),
         solve_seconds=elapsed,
         status=status,
     )
