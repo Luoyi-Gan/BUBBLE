@@ -44,7 +44,11 @@ data/raw          原始数据（默认不入库）
 data/processed    清洗后的小表
 paper/            论文本地备份 / 大纲
 refs/             文献笔记与 bib 线索
-prompts/          三人 Cursor 提示词
+prompts/          队长 / Codex / Cursor / FIN / ACCT 提示词
+docs/specs/       建模规格（Codex 起草 → 队长确认 → Cursor 实现）
+docs/skills-catalog.md  外部 Agent Skills 清单与安装勾选表
+docs/team-onboarding.md 队员协作与 Git 入门（PDF 见 scripts/make_team_onboarding_pdf.py）
+.cursor/skills/   已安装的建模 / 画图 / 文献等 skills（可选）
 results_summary.md  每日关键数字（Cursor 产出、AI 队长确认）
 TEAM.md           分工、酒店节点、额度
 ```
@@ -56,6 +60,8 @@ TEAM.md           分工、酒店节点、额度
 3. ACCT 把能写的段落写入 Overleaf，并在本仓 `paper/` 留备份
 4. 每 4 小时：`git add` 有用的代码和摘要后提交（队长执行）
 
+完整的逐人、逐日早／中／晚安排与签收单见 [`TEAM.md`](TEAM.md)。其中 **9.11 16:00–24:00 为 AI 队长离线保护窗口**：16:00 前必须完成任务交接；窗口内不得改变已确认的模型目标、假设、指标口径或最终结论，疑问登记后待队长返回决策。
+
 ## 硬节点
 
 - 9.10 20:30 选题锁定
@@ -63,7 +69,7 @@ TEAM.md           分工、酒店节点、额度
 - 9.12 24:00 完整初稿
 - 9.13 13:00 已提交（15:00 退房）
 
-## 环境（技）
+## 环境（Cursor / 队长）
 
 ```bash
 python3 -m venv .venv
