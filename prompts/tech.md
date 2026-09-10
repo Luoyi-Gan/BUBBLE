@@ -1,16 +1,13 @@
-# 技 · Prompt
+# 提示词索引
 
-## 选题评估
-1 个 AI + 1 个 FIN + 1 个 ACCT。题目如下[全文]。评估：3 天能否做完、推荐方法、数据从哪来。
+原「技」职责已拆分为三人协作 + 两个 AI 工具：
 
-## 快速建模
-小问[描述]，用[方法]。给完整 Python + LaTeX 公式 + 对账友好的 CSV（列名写清含义）。只改当前小问目录。
+| 文件 | 用途 |
+|------|------|
+| [captain.md](captain.md) | AI 队长：选题终审、规格确认、结果签收、提交 |
+| [codex.md](codex.md) | Codex：建模规格、公式、检验设计、逻辑审阅 |
+| [cursor.md](cursor.md) | Cursor：按规格写代码、产出 `output/` / `fig/` |
+| [fin.md](fin.md) | FIN：解读与模型评价 |
+| [acct.md](acct.md) | ACCT：论文、对账、摘要 |
 
-## 输出格式
-结果输出到 `output/` 的 CSV 和 `fig/` 的图，每列注明含义，方便 ACCT 对账、FIN 解读。
-
-## 检验
-已有模型和结果[描述]。给灵敏度分析 + 两种对比实验，复用 `templates/sensitivity.py`。
-
-## 调试
-代码报错[粘贴]。数据格式[描述]。请修复并解释关键改动。不要重写整个项目。
+开赛流程：队长 → Codex 规格 → 队长确认 → Cursor 实现 → Codex 审阅 → 队长更新 `results_summary.md`。
