@@ -3,14 +3,34 @@
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib import font_manager
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 FIG = ROOT / "fig"
 
+_CN_FONTS = (
+    "PingFang SC",
+    "Heiti SC",
+    "STHeiti",
+    "Songti SC",
+    "Hiragino Sans GB",
+    "Arial Unicode MS",
+)
+
+
+def use_cjk_font() -> None:
+    available = {f.name for f in font_manager.fontManager.ttflist}
+    for name in _CN_FONTS:
+        if name in available:
+            plt.rcParams["font.sans-serif"] = [name, "DejaVu Sans"]
+            plt.rcParams["axes.unicode_minus"] = False
+            return
+
 
 def save_example() -> Path:
     FIG.mkdir(exist_ok=True)
+    use_cjk_font()
     x = np.linspace(0, 10, 200)
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(x, np.sin(x), label="示例曲线")
