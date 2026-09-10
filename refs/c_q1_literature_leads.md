@@ -17,23 +17,25 @@
 | L4 | NREL. *SAM Help: Battery Storage—Battery Dispatch FOM* (2024) [PDF](https://sam.nrel.gov/images/web_page_files/sam-help-2024-12-12.pdf)，[网页](https://samrepo.nrelcloud.org/help/battery_dispatch_fom.html) | 最低/最高 SOC 同时影响可调度能量和循环深度；深循环和频繁切换会影响寿命/性能。 | “Charge Limits and Priority”，PDF 第 333 页。 | 已写入 `c_q1_soc_bounds.md`。 |
 | L5 | Smith K, Shi Y, Wood E, et al. (2016). *Optimizing Battery Usage and Management for Long Life*, NREL/PR-5400-66708. [记录页](https://research-hub.nlr.gov/en/publications/optimizing-battery-usage-and-management-for-long-life-nrel-nation-2/) | SOC 运行窗口属于影响电池老化与寿命管理的设计因素。 | 摘要/报告主题；正式引用前应下载并定位页码。 | 已写入 `c_q1_soc_bounds.md`，作为补充。 |
 
-## C. 待 FIN 完成：效率口径（F2，优先级最高）
+## C. 已采用：效率口径（F2，待队长确认主口径）
 
-| 编号 | 来源与链接 | 待核验问题 | 使用限制 |
+| 编号 | 来源与链接 | 可支持的论断 | 使用限制 |
 |---|---|---|---|
-| L6 | NREL SAM Help, [Battery Dispatch FOM](https://samrepo.nrelcloud.org/help/battery_dispatch_fom.html) | SAM 对 AC/DC 连接系统的 round-trip efficiency 给出转换效率乘积定义；需核对它与题目“充放电效率 90%”的系统边界是否一致。 | 不能直接把 SAM 的 AC/DC 边界套到题目设备。 |
-| L7 | Silva V A, Aoki A R, Lambert-Torres G. (2020). *Optimal Day-Ahead Scheduling of Microgrids with Battery Energy Storage System*, *Energies*, 13(19):5188, DOI [10.3390/en13195188](https://doi.org/10.3390/en13195188) | 其 SOC 递推分别使用充、放电效率，可作为 \(\eta_c,\eta_d\) 拆分的微网建模线索。 | 需核实具体效率参数和测量边界；不能仅凭该文决定题目 90% 口径。 |
+| L6 | NREL. [Utility-Scale Battery Storage: 2022 ATB](https://atb.nrel.gov/electricity/2022/utility-scale_battery_storage) | 往返效率是有用输出能量与有用输入能量之比。 | 公用事业系统性能定义，不赋予本题设备具体参数。 |
+| L7 | Bašić H, Bobanac V, Pandžić H. (2023). *Batteries*, 9(9):459, DOI [10.3390/batteries9090459](https://doi.org/10.3390/batteries9090459) | \(\eta_{rt}=\eta_{ch}\eta_{dis}\)；若显式采用对称单程效率，则 \(\eta_{ch}=\eta_{dis}=\sqrt{\eta_{rt}}\)。 | 电芯实验；单程效率会随工况变化，不可视为本题实测。 |
+| L8 | Pinto E S, Serra L, Lázaro A P. (2022). *Sustainable Cities and Society*, 82:103885, DOI [10.1016/j.scs.2022.103885](https://doi.org/10.1016/j.scs.2022.103885) | 社区微网 MILP 分别使用 \(\eta_{ch}\)、\(\eta_{dis}\)，且 \(\eta_{rt}=\eta_{ch}\eta_{dis}\)。 | 只借鉴 SOC 递推结构，不能移植其市场或设备参数。 |
+| L9 | NREL. [SAM Help: Battery Dispatch FOM](https://samrepo.nrelcloud.org/help/battery_dispatch_fom.html) | AC/DC 接入方式会改变 RTE 所涵盖的变流环节，必须声明边界。 | 不能将 SAM 的 AC/DC 细节直接套到本题。 |
 
 ## D. 背景与方法线索（暂不作为 Q1 参数来源）
 
 | 编号 | 来源与链接 | 可参考内容 | 禁止外推 |
 |---|---|---|---|
-| L8 | Watari D, et al. (2021), 同 L1 | 多时间尺度/MPC 下的 PV 预测和储能调度，可为 Q3 的滚动调整思路提供背景。 | 不将其住宅 PV 参数、SOC 上下限或结果数值移入本题。 |
-| L9 | NREL SAM Help, 同 L4 | 调度需同时考虑价格、PV 可用功率、SOC 与转换损耗。 | SAM 的电价、市场收益、并网限制均非题给参数。 |
-| L10 | Verhagen et al. (2026), 同 L2 | 售电、需量/并网费用、辅助服务和网侧功率限制会改变储能优化。 | 本题未给这些机制；仅用于“模型局限性”说明，不能引入其荷兰市场数值。 |
+| L10 | Watari D, et al. (2021), 同 L1 | 多时间尺度/MPC 下的 PV 预测和储能调度，可为 Q3 的滚动调整思路提供背景。 | 不将其住宅 PV 参数、SOC 上下限或结果数值移入本题。 |
+| L11 | NREL SAM Help, 同 L4 | 调度需同时考虑价格、PV 可用功率、SOC 与转换损耗。 | SAM 的电价、市场收益、并网限制均非题给参数。 |
+| L12 | Verhagen et al. (2026), 同 L2 | 售电、需量/并网费用、辅助服务和网侧功率限制会改变储能优化。 | 本题未给这些机制；仅用于“模型局限性”说明，不能引入其荷兰市场数值。 |
 
 ## 使用规则
 
 1. Q1 硬参数只取自 `C题.pdf` 与附件；文献只用于解释模型结构、术语或局限性。
-2. 论文中优先引用 L1、L2、L4；L3、L5–L10 须经 FIN/ACCT 复核后再进入参考文献表。
-3. F2 未完成前，不锁定 \(\eta_c\)、\(\eta_d\) 的 90% 解释。
+2. 论文中优先引用 L1、L2、L4、L6–L9；L3、L5、L10–L12 须经 FIN/ACCT 复核后再进入参考文献表。
+3. F2 已完成证据包；在队长确认口径 A/B 前，不修改 Q1 规格中的 \(\eta_c\)、\(\eta_d\)。
