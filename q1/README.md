@@ -1,6 +1,6 @@
 # 小问 1 · C 题日前购电 LP
 
-实现依据：`docs/specs/q1.md`、`docs/handoff/cursor-c-q1-implementation.md`。
+实现依据：`docs/specs/q1.md`、`docs/handoff/cursor-c-q1-second-revision.md`。
 
 ## 依赖
 
@@ -20,14 +20,16 @@
 ```bash
 source .venv/bin/activate
 python q1/run_q1.py
+python -m unittest q1.test_q1
 ```
 
 ## 产出
 
 - `output/q1_plan.csv`、`output/q1_summary.csv`
+- `output/q1_baseline.csv`、`output/q1_sensitivity.csv`
 - `output/q1_model_comparison.csv`、`output/q1_model_selection.md`
 - `output/q1_validation.md`
 - `output/result1.xlsx`（复制模板填写，不覆盖附件 5 原件）
 - `fig/fig1_dispatch.png`、`fig/fig1_soc_price.png`
 
-正式结果暂按 **M2**（成本最优后再最小化吞吐量）。
+正式结果为 **M1**（购电费最小）。M2–M4 仅对照。表 2 暂按公共母线侧 `c_t`/`d_t`，待队长签收。
