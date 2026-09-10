@@ -12,7 +12,7 @@
 |------|------|------|
 | AI 队长 | 选题、定模型、签收数字、合并 PR | 绕过对账 |
 | Codex | `docs/specs/` 建模规格、逻辑审阅 | 写代码、替队长决策 |
-| Cursor | `q*/` `output/` `fig/` | 改已确认规格 |
+| Cursor | `q1/`–`q4/` `output/` `fig/` | 改已确认规格 |
 | FIN | `refs/`、结果解读 | 改代码、未核数字 |
 | ACCT | `paper/`、Overleaf、对账 | 估算数字、改模型 |
 

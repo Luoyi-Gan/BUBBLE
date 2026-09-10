@@ -104,7 +104,7 @@ def build():
             [
                 ["AI 队长", "技术同学（人）", "选题、定模型、签收数字、合并 PR、提交", "不绕过对账直接采信未核数字"],
                 ["Codex", "建模 AI（对话）", "写建模规格、审逻辑；在 docs/specs/", "不写代码、不替队长拍板"],
-                ["Cursor", "编程 AI（IDE）", "写 q1/q2/q3 代码，产出 output/ 和 fig/", "不改已确认规格和论文终稿"],
+                ["Cursor", "编程 AI（IDE）", "写 q1–q4 代码，产出 output/ 和 fig/", "不改已确认规格和论文终稿"],
                 ["FIN（你可能是）", "金融同学", "refs/ 文献、结果解读、模型评价", "不改代码、不写未签收数字"],
                 ["ACCT（你可能是）", "会计同学", "paper/、Overleaf、对账、排版提交", "不擅自改模型、不估算数字"],
             ],
@@ -126,7 +126,7 @@ def build():
                 ["fig/", "论文插图 fig1.png …", "Cursor", "ACCT 插入 Overleaf"],
                 ["results_summary.md", "队长签收后的关键数字摘要", "队长确认", "写论文前先看这个"],
                 ["docs/specs/q1.md 等", "建模规格（公式、列名）", "Codex 起草、队长确认", "理解模型口径，不擅自改"],
-                ["q1/ q2/ q3/", "各小问 Python 代码", "Cursor", "FIN/ACCT 一般不改"],
+                ["q1/–q4/", "四小问 Python 代码", "Cursor", "FIN/ACCT 一般不改"],
                 ["data/raw/", "赛题原始附件（本地）", "队长/Cursor", "大文件可能不入库，问队长路径"],
                 ["data/processed/", "清洗后的小表", "Cursor", "需要时查阅"],
                 ["paper/", "论文大纲、本地备份", "ACCT", "与 Overleaf 同步备份"],
