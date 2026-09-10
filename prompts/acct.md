@@ -2,6 +2,10 @@
 
 初稿优先用免费模型；Cursor 只做对账和短段润色。模型表述对照 `docs/specs/`；数字必须等于已确认的 `output/`。
 
+## 当前优先任务：C 题 Q1 论文骨架与对账
+
+按 [`docs/handoff/acct-c-q1-paper-and-reconciliation.md`](../docs/handoff/acct-c-q1-paper-and-reconciliation.md) 执行 A1–A5 和后续签收节奏。未获 AI 队长签收的输出只能在对账表标 `未核`，不得进入论文正文。
+
 ## 约束假设
 题目[背景]。从约束/成本角度列出合理假设及依据（固定/变动、产能、预算等）。
 
