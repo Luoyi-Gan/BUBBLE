@@ -2,9 +2,9 @@
 
 初稿优先用免费模型；Cursor 只做短段润色。数字只引用队长已确认的 `results_summary.md` 与 `output/`。
 
-## 当前优先任务：C 题 Q1 假设证据包
+## 当前优先任务：C 题 Q1 论文支撑全面复核
 
-按 [`docs/handoff/fin-q1-assumption-evidence.md`](../docs/handoff/fin-q1-assumption-evidence.md) 完成 F1–F4。每项只提供可复核来源、可用表述及适用边界；不能自行改变模型规格或确认数值口径。
+F1–F5 证据包已在 `refs/c_q1_*.md` 完成。按 [`docs/handoff/fin-q1-assumption-evidence.md`](../docs/handoff/fin-q1-assumption-evidence.md) 的“新阶段任务”创建 `refs/c_q1_paper_support_audit.md`：逐条核查论文论断的证据类型、题面/附件位置、文献适用边界和潜在越界。只提供可复核来源与审计结论；不能自行改变模型规格或确认效率口径。
 
 ## 理解模型
 我是 FIN 背景。请解释[模型]的决策直觉：像什么决策问题、输入输出、常见应用（不必写成金融术语）。
