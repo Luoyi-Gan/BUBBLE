@@ -39,3 +39,4 @@ data/raw/*
 
 # Jupyter / plots caches
 .mypy_cache/
+.mplconfig/
