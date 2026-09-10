@@ -5,6 +5,8 @@
 **协作对象：** AI 队长（确认口径）、Codex（核查模型表述）、ACCT（写入假设与参考文献）  
 **范围：** 仅 C 题 Q1；不改代码、不改 `docs/specs/q1.md`，不自行确认模型口径。
 
+**完成状态（2026-09-10）：** F3、F4、F5 的证据包已由 Codex 补齐，分别见 `refs/c_q1_initial_soc.md`、`refs/c_q1_soc_bounds.md`、`refs/c_q1_market_boundary.md`；F1、F2 仍由 FIN 负责完成与复核。
+
 ## 一、交付规则
 
 每一条证据必须记录在 `refs/` 的新 Markdown 文件中，并包含：
