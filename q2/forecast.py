@@ -57,10 +57,21 @@ def write_forecast_archive(
 ) -> None:
     frames = []
     for i, date in enumerate(data.dates):
+        load_source_dates = ";".join(
+            data.dates[j].strftime("%Y-%m-%d") for j in archive.load_sources[i]
+        )
+        pv_source_dates = ";".join(
+            data.dates[j].strftime("%Y-%m-%d") for j in archive.pv_sources[i]
+        )
         frames.append(
             pd.DataFrame(
                 {
                     "date": date.strftime("%Y-%m-%d"),
+                    "information_cutoff": (
+                        data.dates[i - 1].strftime("%Y-%m-%d") if i else "attachment1_fallback"
+                    ),
+                    "load_source_dates": load_source_dates or "attachment1_fallback",
+                    "pv_source_dates": pv_source_dates or "attachment1_fallback",
                     "period": np.arange(T),
                     "time": data.time_labels,
                     "load_hat_kwh": archive.load_hat[i],

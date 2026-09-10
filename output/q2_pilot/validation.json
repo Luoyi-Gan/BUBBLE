@@ -16,6 +16,7 @@
       "emergency_cost_yuan": 1307.4686003602053,
       "total_cost_yuan": 22381.817171030612,
       "planned_q_kwh": 40810.84714827769,
+      "planned_q_sha256": "fb65535c26caa56631d1558a509af44fe983b5a56adeab50f95c19dba8eb0e8b",
       "actual_x_kwh": 37394.598243358094,
       "unused_plan_kwh": 3416.248904919591,
       "emergency_kwh": 383.1439442104979,
@@ -25,9 +26,9 @@
       "max_balance_residual_kwh": 1.1368683772161603e-13,
       "max_simultaneous_cd_kwh2": 0.0,
       "max_x_minus_q_kwh": 0.0,
-      "mean_mpc_solve_seconds": 0.007998022876563482,
-      "total_mpc_solve_seconds": 1.1517152942251414,
-      "estimated_334_day_runtime_hours": 0.10685358563088812,
+      "mean_mpc_solve_seconds": 0.00771613768847601,
+      "total_mpc_solve_seconds": 1.1111238271405455,
+      "estimated_334_day_runtime_hours": 0.1030875995180395,
       "pass": true
     },
     {
@@ -37,6 +38,7 @@
       "emergency_cost_yuan": 97.29197475258209,
       "total_cost_yuan": 21805.312799022355,
       "planned_q_kwh": 37436.16768831824,
+      "planned_q_sha256": "b866cb49a98fa78b3551d2d931603791453ccba103da640ba2837b0c0ef02456",
       "actual_x_kwh": 32402.087453803935,
       "unused_plan_kwh": 5034.0802345143065,
       "emergency_kwh": 41.48590148990146,
@@ -46,9 +48,9 @@
       "max_balance_residual_kwh": 1.1368683772161603e-13,
       "max_simultaneous_cd_kwh2": 0.0,
       "max_x_minus_q_kwh": 0.0,
-      "mean_mpc_solve_seconds": 0.008067940353511303,
-      "total_mpc_solve_seconds": 1.1617834109056275,
-      "estimated_334_day_runtime_hours": 0.107787683122911,
+      "mean_mpc_solve_seconds": 0.007461698212864576,
+      "total_mpc_solve_seconds": 1.074484542652499,
+      "estimated_334_day_runtime_hours": 0.09968828812387073,
       "pass": true
     }
   ],
@@ -62,7 +64,9 @@
   "open_items": [
     "x<=q contract semantics await captain sign-off",
     "48-hour terminal value is not included in this two-day pilot",
+    "P1 is a sequential daily perfect-information comparator, not a proven global lower bound against a controller with a different horizon",
     "T_max is not yet specified; timings are reported without K filtering",
-    "pilot day initial SOC comes from the perfect-information continuous path"
+    "pilot day initial SOC comes from the perfect-information continuous path",
+    "the pilot calibrates K at the two target dates; a full 14-day freeze calendar is not run"
   ]
 }

@@ -43,7 +43,7 @@ def main() -> None:
 
     perfect_path = OUTPUT_DIR / "perfect_information_daily.csv"
     day_start_soc = run_perfect_information(data, perfect_path)
-    print("P1 complete: 365-day perfect-information lower bound")
+    print("P1 complete: 365-day sequential perfect-information comparator")
 
     archive = build_forecast_archive(data)
     assert_no_forecast_leakage(archive)

@@ -26,6 +26,7 @@ from q2.config import (  # noqa: E402
     T,
 )
 from q2.data import load_q2_data  # noqa: E402
+from q2.pilot import planned_q_hash  # noqa: E402
 
 
 def require(condition: bool, message: str) -> None:
@@ -56,6 +57,14 @@ def main() -> None:
     forecast = pd.read_csv(OUTPUT_DIR / "forecast_archive.csv")
     require(len(forecast) == 365 * T, "P2 archive rows")
     require(forecast[["load_hat_kwh", "pv_hat_kwh"]].notna().all().all(), "P2 finite")
+    for row in forecast.groupby("date", sort=False).first().reset_index().itertuples():
+        for field in ("load_source_dates", "pv_source_dates"):
+            sources = str(getattr(row, field)).split(";")
+            if sources != ["attachment1_fallback"]:
+                require(
+                    all(pd.Timestamp(source) < pd.Timestamp(row.date) for source in sources),
+                    f"P2 future source in {field} for {row.date}",
+                )
 
     selected = pd.read_csv(OUTPUT_DIR / "scenario_selection.csv")
     require(selected.groupby("calibration_date")["selected"].sum().eq(1).all(), "P3 K choice")
@@ -88,6 +97,11 @@ def main() -> None:
         )
         require(abs(planned_cost - summary["planned_cost_yuan"]) < 1e-6, "P4 q cost")
         require(abs(emergency_cost - summary["emergency_cost_yuan"]) < 1e-6, "P4 e cost")
+        require(
+            planned_q_hash(dispatch["planned_q_kwh"].to_numpy())
+            == summary["planned_q_sha256"],
+            "P4 locked q hash",
+        )
 
     require(not (ROOT / "output" / "result2.xlsx").exists(), "result2.xlsx forbidden")
     print("Q2 pilot independent validation: PASS")

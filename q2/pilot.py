@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from dataclasses import dataclass
 from math import sqrt
 from pathlib import Path
@@ -48,6 +49,13 @@ class KChoice:
     selected_k: int
     scenarios: ScenarioSet
     rows: tuple[dict, ...]
+
+
+def planned_q_hash(q: np.ndarray) -> str:
+    # Decimal canonicalization survives CSV round-trips while detecting any
+    # operationally meaningful mutation of the locked plan.
+    canonical = ",".join(f"{float(value):.9f}" for value in np.asarray(q).ravel())
+    return hashlib.sha256(canonical.encode("ascii")).hexdigest()
 
 
 def run_perfect_information(data: Q2Data, path: Path) -> np.ndarray:
@@ -176,6 +184,7 @@ def write_k_audit(path: Path, choices: list[KChoice], data: Q2Data) -> None:
         "- 采用一标准误规则选取满足阈值的最小 K。",
         "- `T_MAX_SECONDS` 尚未由队长给定，本试算只记录耗时，不据此剔除 K。",
         "- 初期池不足时，自动删除大于可用完整残差日数量的候选 K；若不足 2 日则回退 K=1。",
+        "- 本试算只在两个指定目标日执行校准；全年版本仍需按校准锚点将选中 K 冻结用于随后 14 日。",
         "",
     ]
     for choice in choices:
@@ -206,6 +215,7 @@ def run_posterior_mpc(
         data.price, scenario_load, scenario_pv, scenarios.probabilities, initial_soc
     )
     locked_q = plan.q.copy()
+    locked_q_sha256 = planned_q_hash(locked_q)
     rows = []
     soc = initial_soc
     max_cd = 0.0
@@ -262,6 +272,8 @@ def run_posterior_mpc(
         soc = float(result.soc[1])
     if not np.array_equal(plan.q, locked_q):
         raise AssertionError("locked day-ahead q changed during MPC")
+    if planned_q_hash(locked_q) != locked_q_sha256:
+        raise AssertionError("locked day-ahead q hash changed during MPC")
     frame = pd.DataFrame(rows)
     frame.to_csv(path, index=False)
     return {
@@ -284,6 +296,7 @@ def run_posterior_mpc(
             )
         ),
         "planned_q_kwh": float(locked_q.sum()),
+        "planned_q_sha256": locked_q_sha256,
         "actual_x_kwh": float(frame["actual_x_kwh"].sum()),
         "unused_plan_kwh": float((locked_q - frame["actual_x_kwh"].to_numpy()).sum()),
         "emergency_kwh": float(frame["emergency_kwh"].sum()),
@@ -372,8 +385,13 @@ def write_validation_report(
         "open_items": [
             "x<=q contract semantics await captain sign-off",
             "48-hour terminal value is not included in this two-day pilot",
+            (
+                "P1 is a sequential daily perfect-information comparator, not a proven "
+                "global lower bound against a controller with a different horizon"
+            ),
             "T_max is not yet specified; timings are reported without K filtering",
             "pilot day initial SOC comes from the perfect-information continuous path",
+            "the pilot calibrates K at the two target dates; a full 14-day freeze calendar is not run",
         ],
     }
     path_json.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -381,7 +399,7 @@ def write_validation_report(
         "# Q2 分阶段试算验证",
         "",
         f"- 总体状态：**{report['status']}**",
-        f"- 完美信息 365 日全部通过：{report['perfect_information']['all_days_pass']}",
+        f"- 逐日完美信息比较器 365 日全部通过：{report['perfect_information']['all_days_pass']}",
         f"- 完美信息紧急购电：{report['perfect_information']['emergency_purchase_kwh']:.6e} kWh",
         f"- 完美信息最大能量平衡残差：{report['perfect_information']['max_balance_residual_kwh']:.6e} kWh",
         f"- 完美信息跨日 SOC 最大断点：{report['perfect_information']['max_cross_day_soc_gap_kwh']:.6e} kWh",
@@ -408,7 +426,9 @@ def write_validation_report(
         "",
         "- `x<=q` 暂定合同语义待队长签收。",
         "- 本两日试算未实现 48 小时终端价值；日初 SOC 来自完美信息连续轨迹。",
+        "- P1 与主方案视域不同，因此当前只能称“逐日完美信息比较器”，不能据此强制认定全局下界。",
         "- `T_max` 未给定，因此动态 K 只按一标准误规则选取并报告耗时。",
+        "- 本试算仅在两个目标日校准 K，尚未展开全年“选中后冻结 14 日”的运行日历。",
         "- 未生成或修改 `result2.xlsx`。",
     ]
     path_md.write_text("\n".join(lines) + "\n", encoding="utf-8")

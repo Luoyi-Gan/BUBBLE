@@ -29,4 +29,6 @@ python q2/validate_q2_pilot.py
 - `fig/q2_pilot/`
 
 本流程只验证 P0–P4，不创建或修改 `result2.xlsx`。合同 `x<=q`、48 小时
-终端价值与 `T_max` 仍待签收，配置集中在 `q2/config.py`。
+终端价值与 `T_max` 仍待签收，配置集中在 `q2/config.py`。P1 当前是跨日
+SOC 连续的逐日完美信息比较器；由于它和待定的 48 小时主方案视域不同，
+暂不将其宣称为严格的全局下界。
