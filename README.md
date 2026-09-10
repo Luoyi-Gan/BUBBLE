@@ -55,6 +55,8 @@ TEAM.md           分工、酒店节点、额度
 
 ## 每日节奏
 
+当前阶段交接见 [`docs/handoff/2026-09-11-end-of-day.md`](docs/handoff/2026-09-11-end-of-day.md)。
+
 1. Cursor 把可复核结果写入 `output/`；AI 队长确认后更新 `results_summary.md`
 2. 演示会：AI 队长展示模型与图 → ACCT 对账 → FIN 问决策含义
 3. ACCT 把能写的段落写入 Overleaf，并在本仓 `paper/` 留备份
