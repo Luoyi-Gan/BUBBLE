@@ -47,6 +47,7 @@ refs/             文献笔记与 bib 线索
 prompts/          队长 / Codex / Cursor / FIN / ACCT 提示词
 docs/specs/       建模规格（Codex 起草 → 队长确认 → Cursor 实现）
 docs/skills-catalog.md  外部 Agent Skills 清单与安装勾选表
+docs/team-onboarding.md 队员协作与 Git 入门（PDF 见 scripts/make_team_onboarding_pdf.py）
 .cursor/skills/   已安装的建模 / 画图 / 文献等 skills（可选）
 results_summary.md  每日关键数字（Cursor 产出、AI 队长确认）
 TEAM.md           分工、酒店节点、额度
