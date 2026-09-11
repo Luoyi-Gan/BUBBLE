@@ -67,4 +67,12 @@ python q2/validate_q2_policy_consistent.py
 ```
 
 C2-R1 只跑 2025-02-01 与 2025-06-21 两日闭环试运行，输出到
-`output/q2_policy_consistent/`。14 日联合校准与全年运行为后续阶段。
+`output/q2_policy_consistent/`。
+
+```bash
+python q2/run_q2_policy_consistent_r2.py
+python q2/validate_q2_policy_consistent.py
+```
+
+C2-R2 对每个 14 日块评估 12 组 `(m,α)` 闭环政策，以实际成本 $\sum(pq+5pe)$ 选择主策略；
+MAE 只作诊断。全年正式台账与敏感性仍留到 C2-R3。

@@ -122,6 +122,71 @@ def main() -> None:
         _ = i
 
     print("C2-R1 artifact validation passed")
+    if (output / "closed_loop_calibration.csv").exists():
+        validate_r2(output, data, diagnostics, consistency, report)
+
+
+def validate_r2(
+    output: Path,
+    data,
+    diagnostics: pd.DataFrame,
+    consistency: dict,
+    report: dict,
+) -> None:
+    from q2.config import RISK_ALPHA_CANDIDATES
+    from q2.policy_consistent import FORECAST_MODES
+
+    calibration = pd.read_csv(output / "closed_loop_calibration.csv")
+    deployed = pd.read_csv(output / "r2_deployed_daily.csv")
+    n_candidates = len(FORECAST_MODES) * len(RISK_ALPHA_CANDIDATES)
+    require(n_candidates == 12, "12 (m, alpha) pairs")
+    require(consistency["stage"] == "C2-R2", "R2 stage")
+    require(consistency["calibration_closed_loop"] is True, "closed-loop calibration")
+    require(consistency["mae_is_diagnostic_only"] is True, "MAE diagnostic flag")
+    require(consistency["mae_used_for_selection"] is False, "MAE not used to select")
+    require(consistency["validation_uses_full_day_actual_lp"] is False, "R2 no full-day LP")
+    require(consistency["formal_execution_uses_full_day_actual_lp"] is False, "deploy no full-day LP")
+    require(consistency["calibration_and_execution_exclude_future_actuals"] is True, "no future actuals")
+    require(consistency["annual_run"] is False, "R3 annual run not started")
+    require(report["candidate_result2_xlsx"] is False, "no candidate result2")
+    require(diagnostics["selection_role"].eq("diagnostic_only").all(), "R2 MAE diagnostic")
+    require(len(deployed) == len(data.dates), "deployed path covers the year for SOC")
+    require(deployed["pass"].all(), "deployed physical pass")
+    require(not deployed["used_full_day_actual_lp"].any(), "deployed used full-day LP")
+    require(not deployed["future_actuals_in_optimizer"].any(), "deployed future actuals")
+    require(
+        np.max(np.abs(deployed["soc_start_kwh"].to_numpy()[1:] - deployed["soc_end_kwh"].to_numpy()[:-1]))
+        < NUMERIC_TOL,
+        "deployed SOC continuity",
+    )
+
+    scored = calibration.loc[calibration["fallback_reason"].fillna("") == ""]
+    require((scored.groupby("calibration_date").size() == n_candidates).all(), "12 candidates per scored block")
+    require(
+        calibration.loc[calibration["selected"].astype(bool)].groupby("calibration_date").size().eq(1).all(),
+        "one selected pair per block",
+    )
+    require(not scored["used_full_day_actual_lp"].any(), "candidate used full-day LP")
+    require(not scored["future_actuals_in_optimizer"].any(), "candidate future actuals")
+    for _, block in scored.groupby("calibration_date"):
+        best = block["mean_actual_cost_yuan"].min()
+        selected_row = block.loc[block["selected"].astype(bool)].iloc[0]
+        threshold = float(selected_row["one_se_threshold_yuan"])
+        require(float(selected_row["mean_actual_cost_yuan"]) <= threshold + 1e-8, "selected within 1-SE")
+        require(best <= float(selected_row["mean_actual_cost_yuan"]) + 1e-8, "best cost not worse than selected")
+        require(
+            pd.Timestamp(selected_row["history_cutoff_date"])
+            == pd.Timestamp(selected_row["calibration_date"]) - pd.Timedelta(days=1),
+            "calibration cutoff is last history day",
+        )
+        window_start = pd.Timestamp(selected_row["validation_start_date"])
+        deployed_start = deployed.loc[deployed["date"] == window_start.strftime("%Y-%m-%d"), "soc_start_kwh"]
+        require(len(deployed_start) == 1, "window start date in deployed path")
+        require(
+            abs(float(selected_row["window_start_soc_kwh"]) - float(deployed_start.iloc[0])) < 1e-6,
+            "window SOC comes from deployed policy",
+        )
+    print("C2-R2 artifact validation passed")
 
 
 if __name__ == "__main__":

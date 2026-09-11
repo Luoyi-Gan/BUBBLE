@@ -282,6 +282,71 @@ class Q2PolicyConsistentTests(unittest.TestCase):
         self.assertAlmostEqual(high[0]["soc_start_kwh"], 7000.0)
         self.assertNotAlmostEqual(low[0]["soc_end_kwh"], high[0]["soc_end_kwh"], places=3)
 
+    def test_closed_loop_has_twelve_mode_alpha_pairs(self) -> None:
+        from q2.config import RISK_ALPHA_CANDIDATES
+        from q2.policy_consistent import FORECAST_MODES
+
+        self.assertEqual(len(FORECAST_MODES), 3)
+        self.assertEqual(len(RISK_ALPHA_CANDIDATES), 4)
+        self.assertEqual(len(FORECAST_MODES) * len(RISK_ALPHA_CANDIDATES), 12)
+
+    def test_one_se_tiebreak_uses_cost_then_unused_then_m1_then_alpha(self) -> None:
+        from q2.policy_consistent import one_se_tiebreak
+
+        rows = [
+            {
+                "forecast_mode": "m2",
+                "risk_alpha": 0.6,
+                "mean_actual_cost_yuan": 100.0,
+                "standard_error_yuan": 5.0,
+                "mean_unused_plan_kwh": 50.0,
+            },
+            {
+                "forecast_mode": "m1",
+                "risk_alpha": 0.7,
+                "mean_actual_cost_yuan": 103.0,
+                "standard_error_yuan": 1.0,
+                "mean_unused_plan_kwh": 10.0,
+            },
+            {
+                "forecast_mode": "m3",
+                "risk_alpha": 0.6,
+                "mean_actual_cost_yuan": 90.0,
+                "standard_error_yuan": 1.0,
+                "mean_unused_plan_kwh": 80.0,
+            },
+        ]
+        selected = one_se_tiebreak(rows)
+        self.assertEqual(selected["forecast_mode"], "m3")
+        self.assertEqual(selected["risk_alpha"], 0.6)
+
+        near = [
+            {
+                "forecast_mode": "m2",
+                "risk_alpha": 0.9,
+                "mean_actual_cost_yuan": 100.0,
+                "standard_error_yuan": 4.0,
+                "mean_unused_plan_kwh": 20.0,
+            },
+            {
+                "forecast_mode": "m1",
+                "risk_alpha": 0.8,
+                "mean_actual_cost_yuan": 102.0,
+                "standard_error_yuan": 1.0,
+                "mean_unused_plan_kwh": 20.0,
+            },
+            {
+                "forecast_mode": "m1",
+                "risk_alpha": 0.6,
+                "mean_actual_cost_yuan": 103.0,
+                "standard_error_yuan": 1.0,
+                "mean_unused_plan_kwh": 20.0,
+            },
+        ]
+        selected_near = one_se_tiebreak(near)
+        self.assertEqual(selected_near["forecast_mode"], "m1")
+        self.assertEqual(selected_near["risk_alpha"], 0.6)
+
 
 if __name__ == "__main__":
     unittest.main()

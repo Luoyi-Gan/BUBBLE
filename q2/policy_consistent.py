@@ -6,9 +6,11 @@ K-medoids enter only through the risk reserve R(alpha) and intra-day residual we
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from math import sqrt
+import os
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +22,7 @@ from q2.config import (
     E_MAX_KWH,
     E_MIN_KWH,
     FIXED_SCENARIO_K,
+    K_RECALIBRATION_DAYS,
     LOAD_HISTORY_SAME_WEEKDAY,
     NEXT_DAY_VALUE_GAP_TOL_YUAN,
     NEXT_DAY_VALUE_MAX_SAMPLES,
@@ -27,6 +30,7 @@ from q2.config import (
     POWER_LIMIT_KWH,
     PV_HISTORY_DAYS,
     RISK_ALPHA_CANDIDATES,
+    RISK_CALIBRATION_DAYS,
     SIMULTANEOUS_CD_TOL,
     T,
 )
@@ -622,60 +626,304 @@ def one_se_tiebreak(
     )
 
 
+def score_one_candidate(
+    data: Q2Data,
+    archive: ForecastArchive,
+    mode_value: str,
+    alpha: float,
+    validation_indices: tuple[int, ...],
+    window_start_soc: float,
+    k: int = FIXED_SCENARIO_K,
+) -> dict:
+    """Run one (m, alpha) on a finished-day window with that candidate's own SOC path."""
+    mode = ForecastMode(mode_value)
+    costs: list[float] = []
+    unused: list[float] = []
+    planned: list[float] = []
+    emergency: list[float] = []
+    times: list[float] = []
+    soc_path = [float(window_start_soc)]
+    soc = float(window_start_soc)
+    used_full_day_actual_lp = False
+    future_actuals_in_optimizer = False
+    for i in validation_indices:
+        summary, _frame, _plan, _floor, _scenarios = plan_closed_loop_day(
+            data,
+            archive,
+            int(i),
+            soc,
+            mode=mode,
+            risk_alpha=float(alpha),
+            k=k,
+            terminal_value_cuts=None,
+        )
+        used_full_day_actual_lp = used_full_day_actual_lp or bool(
+            summary["used_full_day_actual_lp"]
+        )
+        future_actuals_in_optimizer = future_actuals_in_optimizer or bool(
+            summary["future_actuals_in_optimizer"]
+        )
+        costs.append(summary["total_cost_yuan"])
+        unused.append(summary["unused_plan_kwh"])
+        planned.append(summary["planned_cost_yuan"])
+        emergency.append(summary["emergency_cost_yuan"])
+        times.append(summary["day_ahead_solve_seconds"] + summary["total_mpc_solve_seconds"])
+        soc = float(summary["soc_end_kwh"])
+        soc_path.append(soc)
+    return {
+        "forecast_mode": mode.value,
+        "risk_alpha": float(alpha),
+        "validation_days": int(len(validation_indices)),
+        "window_start_soc_kwh": float(window_start_soc),
+        "candidate_soc_end_kwh": soc,
+        "candidate_soc_path_kwh": ";".join(f"{value:.6f}" for value in soc_path),
+        "mean_actual_cost_yuan": float(np.mean(costs)),
+        "standard_error_yuan": float(
+            np.std(costs, ddof=1) / sqrt(len(costs)) if len(costs) > 1 else 0.0
+        ),
+        "mean_planned_cost_yuan": float(np.mean(planned)),
+        "mean_emergency_cost_yuan": float(np.mean(emergency)),
+        "mean_unused_plan_kwh": float(np.mean(unused)),
+        "mean_solve_seconds": float(np.mean(times)),
+        "used_full_day_actual_lp": used_full_day_actual_lp,
+        "future_actuals_in_optimizer": future_actuals_in_optimizer,
+        "selection_criterion": "mean_actual_cost_sum_pq_plus_5pe",
+    }
+
+
+def _score_candidate_job(payload: dict) -> dict:
+    return score_one_candidate(
+        payload["data"],
+        payload["archive"],
+        payload["mode_value"],
+        payload["alpha"],
+        payload["validation_indices"],
+        payload["window_start_soc"],
+        payload["k"],
+    )
+
+
 def closed_loop_candidate_window(
     data: Q2Data,
     archives: dict[ForecastMode, ForecastArchive],
     validation_indices: np.ndarray,
     window_start_soc: float,
     k: int = FIXED_SCENARIO_K,
+    workers: int | None = None,
 ) -> list[dict]:
-    """Score each (m, alpha) by the same residual-MPC policy. No full-day actual LP."""
-    records: list[dict] = []
-    for mode in FORECAST_MODES:
-        archive = archives[mode]
-        for alpha in RISK_ALPHA_CANDIDATES:
-            costs = []
-            unused = []
-            planned = []
-            emergency = []
-            times = []
-            soc = float(window_start_soc)
-            for i in validation_indices:
-                summary, _frame, _plan, _floor, _scenarios = plan_closed_loop_day(
-                    data,
-                    archive,
-                    int(i),
-                    soc,
-                    mode=mode,
-                    risk_alpha=float(alpha),
-                    k=k,
-                    terminal_value_cuts=None,
-                )
-                costs.append(summary["total_cost_yuan"])
-                unused.append(summary["unused_plan_kwh"])
-                planned.append(summary["planned_cost_yuan"])
-                emergency.append(summary["emergency_cost_yuan"])
-                times.append(
-                    summary["day_ahead_solve_seconds"] + summary["total_mpc_solve_seconds"]
-                )
-                soc = float(summary["soc_end_kwh"])
-            records.append(
+    """Score all 12 (m, alpha) pairs by the same residual-MPC policy."""
+    indices = tuple(int(i) for i in np.asarray(validation_indices).ravel())
+    jobs = [
+        {
+            "data": data,
+            "archive": archives[mode],
+            "mode_value": mode.value,
+            "alpha": float(alpha),
+            "validation_indices": indices,
+            "window_start_soc": float(window_start_soc),
+            "k": k,
+        }
+        for mode in FORECAST_MODES
+        for alpha in RISK_ALPHA_CANDIDATES
+    ]
+    n_workers = int(os.environ.get("Q2_R2_WORKERS", workers if workers is not None else 8))
+    n_workers = max(1, min(n_workers, len(jobs)))
+    if n_workers == 1:
+        records = [_score_candidate_job(job) for job in jobs]
+    else:
+        with ThreadPoolExecutor(max_workers=n_workers) as pool:
+            records = list(pool.map(_score_candidate_job, jobs))
+    if len(records) != len(FORECAST_MODES) * len(RISK_ALPHA_CANDIDATES):
+        raise AssertionError("closed-loop calibration must evaluate 12 (m, alpha) pairs")
+    selected = one_se_tiebreak(records)
+    threshold = selected["mean_actual_cost_yuan"] + selected["standard_error_yuan"]
+    for row in records:
+        row["selected"] = (
+            row["forecast_mode"] == selected["forecast_mode"]
+            and row["risk_alpha"] == selected["risk_alpha"]
+        )
+        row["one_se_threshold_yuan"] = threshold
+    return records
+
+
+def _validation_diagnostics(
+    data: Q2Data,
+    archives: dict[ForecastMode, ForecastArchive],
+    validation_indices: np.ndarray,
+    k: int,
+) -> dict[str, dict[str, float]]:
+    by_mode: dict[str, dict[str, float]] = {}
+    for mode, archive in archives.items():
+        load_mae = []
+        pv_mae = []
+        net_mae = []
+        coverage = []
+        for i in validation_indices:
+            rows = mode_diagnostics(data, int(i), {mode: archive}, RISK_ALPHA_CANDIDATES[0], k=k)
+            load_mae.append(rows[0]["load_mae_kwh"])
+            pv_mae.append(rows[0]["pv_mae_kwh"])
+            net_mae.append(rows[0]["net_load_mae_kwh"])
+            coverage.append(rows[0]["quantile_coverage"])
+        coverage_arr = np.asarray(coverage, dtype=float)
+        finite = coverage_arr[np.isfinite(coverage_arr)]
+        by_mode[mode.value] = {
+            "load_mae_kwh": float(np.mean(load_mae)),
+            "pv_mae_kwh": float(np.mean(pv_mae)),
+            "net_load_mae_kwh": float(np.mean(net_mae)),
+            "quantile_coverage": float(np.mean(finite)) if finite.size else float("nan"),
+        }
+    return by_mode
+
+
+def run_rolling_closed_loop_calibration(
+    data: Q2Data,
+    archives: dict[ForecastMode, ForecastArchive],
+    k: int = FIXED_SCENARIO_K,
+    workers: int | None = None,
+) -> tuple[list[dict], list[dict], list[dict]]:
+    """Walk 14-day blocks, score 12 candidates, then deploy the winner to carry SOC."""
+    n = len(data.dates)
+    policy_start_soc = np.full(n, np.nan)
+    soc = float(E_INITIAL_KWH)
+    calibration_rows: list[dict] = []
+    diagnostic_rows: list[dict] = []
+    deployed_rows: list[dict] = []
+    block = K_RECALIBRATION_DAYS
+    window = RISK_CALIBRATION_DAYS
+
+    for calibration in range(0, n, block):
+        effective_end = min(calibration + block - 1, n - 1)
+        validation = np.arange(max(0, calibration - window), calibration)
+        history_cutoff = (
+            data.dates[calibration - 1].strftime("%Y-%m-%d")
+            if calibration
+            else "attachment1_fallback"
+        )
+        block_meta = {
+            "calibration_date": data.dates[calibration].strftime("%Y-%m-%d"),
+            "history_cutoff_date": history_cutoff,
+            "effective_start_date": data.dates[calibration].strftime("%Y-%m-%d"),
+            "effective_end_date": data.dates[effective_end].strftime("%Y-%m-%d"),
+        }
+        if len(validation) < window:
+            selected_mode = ForecastMode.M1
+            selected_alpha: float | None = None
+            fallback = "insufficient_prior_14_day_window"
+            calibration_rows.append(
                 {
-                    "forecast_mode": mode.value,
-                    "risk_alpha": float(alpha),
-                    "validation_days": int(len(validation_indices)),
-                    "mean_actual_cost_yuan": float(np.mean(costs)),
-                    "standard_error_yuan": float(
-                        np.std(costs, ddof=1) / sqrt(len(costs)) if len(costs) > 1 else 0.0
-                    ),
-                    "mean_planned_cost_yuan": float(np.mean(planned)),
-                    "mean_emergency_cost_yuan": float(np.mean(emergency)),
-                    "mean_unused_plan_kwh": float(np.mean(unused)),
-                    "mean_solve_seconds": float(np.mean(times)),
+                    **block_meta,
+                    "forecast_mode": selected_mode.value,
+                    "risk_alpha": selected_alpha,
+                    "validation_days": int(len(validation)),
+                    "validation_start_date": "none",
+                    "validation_end_date": "none",
+                    "window_start_soc_kwh": float(soc),
+                    "candidate_soc_end_kwh": float("nan"),
+                    "candidate_soc_path_kwh": "",
+                    "mean_actual_cost_yuan": float("nan"),
+                    "standard_error_yuan": float("nan"),
+                    "mean_planned_cost_yuan": float("nan"),
+                    "mean_emergency_cost_yuan": float("nan"),
+                    "mean_unused_plan_kwh": float("nan"),
+                    "mean_solve_seconds": float("nan"),
                     "used_full_day_actual_lp": False,
+                    "future_actuals_in_optimizer": False,
+                    "selection_criterion": "mean_actual_cost_sum_pq_plus_5pe",
+                    "one_se_threshold_yuan": float("nan"),
+                    "selected": True,
+                    "fallback_reason": fallback,
                 }
             )
-    selected = one_se_tiebreak(records)
-    for row in records:
-        row["selected"] = row is selected
-    return records
+            active_k = 1
+        else:
+            window_start_soc = float(policy_start_soc[int(validation[0])])
+            if not np.isfinite(window_start_soc):
+                raise AssertionError("deployed policy SOC missing at validation window start")
+            records = closed_loop_candidate_window(
+                data,
+                archives,
+                validation,
+                window_start_soc,
+                k=k,
+                workers=workers,
+            )
+            mae_by_mode = _validation_diagnostics(data, archives, validation, k=k)
+            selected_row = next(row for row in records if row["selected"])
+            selected_mode = ForecastMode(selected_row["forecast_mode"])
+            selected_alpha = float(selected_row["risk_alpha"])
+            fallback = ""
+            active_k = k
+            for row in records:
+                calibration_rows.append(
+                    {
+                        **block_meta,
+                        **row,
+                        "validation_start_date": data.dates[int(validation[0])].strftime(
+                            "%Y-%m-%d"
+                        ),
+                        "validation_end_date": data.dates[int(validation[-1])].strftime(
+                            "%Y-%m-%d"
+                        ),
+                        "fallback_reason": fallback,
+                    }
+                )
+                diagnostic = mae_by_mode[row["forecast_mode"]]
+                diagnostic_rows.append(
+                    {
+                        **block_meta,
+                        "forecast_mode": row["forecast_mode"],
+                        "risk_alpha": row["risk_alpha"],
+                        "load_mae_kwh": diagnostic["load_mae_kwh"],
+                        "pv_mae_kwh": diagnostic["pv_mae_kwh"],
+                        "net_load_mae_kwh": diagnostic["net_load_mae_kwh"],
+                        "quantile_coverage": diagnostic["quantile_coverage"],
+                        "mean_planned_cost_yuan": row["mean_planned_cost_yuan"],
+                        "mean_emergency_cost_yuan": row["mean_emergency_cost_yuan"],
+                        "mean_unused_plan_kwh": row["mean_unused_plan_kwh"],
+                        "mean_actual_cost_yuan": row["mean_actual_cost_yuan"],
+                        "selected": row["selected"],
+                        "selection_role": "diagnostic_only",
+                    }
+                )
+            print(
+                f"C2-R2 {block_meta['calibration_date']}: "
+                f"selected {selected_mode.value} α={selected_alpha:.2f} "
+                f"cost={selected_row['mean_actual_cost_yuan']:.2f}",
+                flush=True,
+            )
+
+        for i in range(calibration, effective_end + 1):
+            policy_start_soc[i] = soc
+            summary, _frame, _plan, _floor, _scenarios = plan_closed_loop_day(
+                data,
+                archives[selected_mode],
+                i,
+                soc,
+                mode=selected_mode,
+                risk_alpha=selected_alpha,
+                k=active_k,
+                terminal_value_cuts=None,
+            )
+            if not summary["pass"]:
+                raise AssertionError(f"deployed policy failed on {summary['date']}")
+            deployed_rows.append(
+                {
+                    "date": summary["date"],
+                    "forecast_mode": selected_mode.value,
+                    "risk_alpha": selected_alpha,
+                    "scenario_k": active_k if selected_alpha is not None else 1,
+                    "soc_start_kwh": summary["soc_start_kwh"],
+                    "soc_end_kwh": summary["soc_end_kwh"],
+                    "planned_cost_yuan": summary["planned_cost_yuan"],
+                    "emergency_cost_yuan": summary["emergency_cost_yuan"],
+                    "total_cost_yuan": summary["total_cost_yuan"],
+                    "unused_plan_kwh": summary["unused_plan_kwh"],
+                    "emergency_kwh": summary["emergency_kwh"],
+                    "used_full_day_actual_lp": summary["used_full_day_actual_lp"],
+                    "future_actuals_in_optimizer": summary["future_actuals_in_optimizer"],
+                    "pass": summary["pass"],
+                    "fallback_reason": fallback,
+                }
+            )
+            soc = float(summary["soc_end_kwh"])
+    return calibration_rows, diagnostic_rows, deployed_rows
