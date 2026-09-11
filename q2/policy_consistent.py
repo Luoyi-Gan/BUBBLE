@@ -286,7 +286,11 @@ def build_baseline_value_cuts(
     rows = [
         {
             "target_date": data.dates[nxt].strftime("%Y-%m-%d"),
-            "history_cutoff_date": data.dates[current_index].strftime("%Y-%m-%d"),
+            "history_cutoff_date": (
+                data.dates[current_index - 1].strftime("%Y-%m-%d")
+                if current_index
+                else "attachment1_fallback"
+            ),
             "forecast_mode": mode.value,
             "risk_alpha": risk_alpha,
             "risk_q_floor_kwh": float(q_floor.sum()),

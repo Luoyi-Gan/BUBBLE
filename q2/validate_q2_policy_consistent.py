@@ -79,6 +79,16 @@ def main() -> None:
     require(not physical["used_full_day_actual_lp"].any(), "artifact used full-day LP")
     require(diagnostics["selection_role"].eq("diagnostic_only").all(), "MAE must stay diagnostic")
 
+    value_audit = pd.read_csv(output / "next_day_value_audit.csv")
+    require(set(value_audit["decision_date"]) == set(PILOT_DATES), "value-cut decision dates")
+    for row in value_audit.itertuples():
+        decision = pd.Timestamp(row.decision_date)
+        cutoff = pd.Timestamp(row.history_cutoff_date)
+        target = pd.Timestamp(row.target_date)
+        require(cutoff == decision - pd.Timedelta(days=1), f"cutoff is last history day for {row.decision_date}")
+        require(cutoff < decision, f"cutoff precedes decision {row.decision_date}")
+        require(target == decision + pd.Timedelta(days=1), f"target is next day for {row.decision_date}")
+
     for date_text in PILOT_DATES:
         i = int(data.dates.get_loc(pd.Timestamp(date_text)))
         frame = pd.read_csv(output / "dispatch_daily" / f"dispatch_{date_text}.csv")
@@ -104,6 +114,10 @@ def main() -> None:
             f"{date_text} simultaneous charge/discharge",
         )
         require(frame["charge_kwh"].max() <= POWER_LIMIT_KWH + NUMERIC_TOL, f"{date_text} charge limit")
+        require(
+            frame["discharge_kwh"].max() <= POWER_LIMIT_KWH + NUMERIC_TOL,
+            f"{date_text} discharge limit",
+        )
         require(np.allclose(frame["load_kwh"].to_numpy(), data.load[i], atol=1e-12), "dispatch load")
         _ = i
 

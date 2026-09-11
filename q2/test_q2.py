@@ -193,6 +193,17 @@ class Q2PolicyConsistentTests(unittest.TestCase):
         self.assertTrue(np.all(scenarios.medoid_indices < 31))
         self.assertEqual(len(scenarios.probabilities), 8)
 
+    def test_value_cut_history_cutoff_is_last_available_day(self) -> None:
+        from q2.policy_consistent import ForecastMode, build_baseline_value_cuts
+
+        _cuts, rows = build_baseline_value_cuts(
+            self.data, self.archive, 31, ForecastMode.M1
+        )
+        self.assertGreaterEqual(len(rows), 1)
+        self.assertEqual(rows[0]["history_cutoff_date"], "2025-01-31")
+        self.assertEqual(rows[0]["target_date"], "2025-02-02")
+        self.assertTrue(all(row["history_cutoff_date"] == "2025-01-31" for row in rows))
+
     def test_future_actual_perturbation_does_not_change_earlier_actions(self) -> None:
         from dataclasses import replace
 
@@ -251,6 +262,7 @@ class Q2PolicyConsistentTests(unittest.TestCase):
             SIMULTANEOUS_CD_TOL,
         )
         self.assertLessEqual(frame["charge_kwh"].max(), POWER_LIMIT_KWH + NUMERIC_TOL)
+        self.assertLessEqual(frame["discharge_kwh"].max(), POWER_LIMIT_KWH + NUMERIC_TOL)
         self.assertTrue(summary["pass"])
         self.assertFalse(summary["used_full_day_actual_lp"])
         self.assertFalse(plan.has_scenario_specific_battery)

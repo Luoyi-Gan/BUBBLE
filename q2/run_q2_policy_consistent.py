@@ -199,6 +199,7 @@ def main() -> None:
         "- 两日初值均记录为孤立试算的 6000 kWh；1 月预热与 2 月初 SOC 敏感性留到 C2-R3。",
         f"- 主路径预注册：m={R1_DEFAULT_MODE.value}，α={R1_DEFAULT_ALPHA}，K={FIXED_SCENARIO_K}。",
         "- MAE/覆盖率只写入 `forecast_diagnostics.csv`，不作为选择准则。",
+        "- `history_cutoff_date` 记录最后可用历史日，例如 2 月 1 日决策记为 1 月 31 日。",
         "",
     ]
     for item in summaries:
