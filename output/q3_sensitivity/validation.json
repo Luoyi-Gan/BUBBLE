@@ -1,0 +1,8 @@
+{
+  "all_pass": true,
+  "failures": [],
+  "n_comparison_rows": 40,
+  "n_ledger_rows": 18864,
+  "git_commit": "d7244c1d9913d1b2bb229c2f540cae11065718ca",
+  "load_treatment": "causal_load_main"
+}
