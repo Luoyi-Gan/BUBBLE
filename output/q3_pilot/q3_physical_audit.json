@@ -1,0 +1,150 @@
+{
+  "all_pass": true,
+  "warmup_end_soc_for_2025-02-01": 8428.291708583261,
+  "runs": [
+    {
+      "date": "2025-02-01",
+      "strategy": "M0",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 9.094947017729282e-13,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10800.0,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-02-01",
+      "strategy": "M1_M6",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 9.094947017729282e-13,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10785.594172744537,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-02-01",
+      "strategy": "M6_only",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 9.094947017729282e-13,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10799.99999438401,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-02-01",
+      "strategy": "M12_only",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 9.094947017729282e-13,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10799.999999972462,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-02-01",
+      "strategy": "M18_only",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 9.094947017729282e-13,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10800.0,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-02-01",
+      "strategy": "M1_M6",
+      "with_terminal_value": false,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 4.6386048779822886e-08,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10775.278889413976,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-06-21",
+      "strategy": "M0",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 0.0,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10800.0,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-06-21",
+      "strategy": "M1_M6",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 0.0,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10800.0,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-06-21",
+      "strategy": "M6_only",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 0.0,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1216.1429179770935,
+      "soc_max_kwh": 10800.0,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-06-21",
+      "strategy": "M12_only",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 0.0,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10800.0,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-06-21",
+      "strategy": "M18_only",
+      "with_terminal_value": true,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 0.0,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10800.0,
+      "locked_period_violations": 0,
+      "pass": true
+    },
+    {
+      "date": "2025-06-21",
+      "strategy": "M1_M6",
+      "with_terminal_value": false,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_soc_residual_kwh": 4.826415533898398e-08,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "soc_min_kwh": 1200.0,
+      "soc_max_kwh": 10800.0,
+      "locked_period_violations": 0,
+      "pass": true
+    }
+  ]
+}

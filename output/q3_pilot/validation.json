@@ -1,0 +1,7 @@
+{
+  "all_pass": true,
+  "failures": [],
+  "n_comparison_rows": 12,
+  "n_mapping_rows": 1152,
+  "max_simultaneous_cd_tol": 0.0001
+}
