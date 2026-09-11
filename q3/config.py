@@ -87,6 +87,10 @@ TERMINAL_SOC_PILOT_START = "2025-12-01"
 TERMINAL_SOC_PILOT_END = "2025-12-31"
 TERMINAL_SOC_OUTPUT_DIR = ROOT / "output" / "q3_terminal_soc_pilot"
 TERMINAL_SOC_FIG_DIR = ROOT / "fig" / "q3_terminal_soc_pilot"
+ANNUAL_OUTPUT_DIR = ROOT / "output" / "q3_full_annual"
+ANNUAL_FIG_DIR = ROOT / "fig" / "q3_full_annual"
+ANNUAL_START = "2025-01-01"
+ANNUAL_END = "2025-12-31"
 
 
 def year_end_tag(year_end_soc_kwh: float | None) -> str:

@@ -424,5 +424,62 @@ class YearEndSocAttachmentTests(unittest.TestCase):
         self.assertEqual(int(run.summary["locked_period_violations"]), 0)
 
 
+class FullAnnualHelperTests(unittest.TestCase):
+    def test_parse_boundaries_a_b_both(self) -> None:
+        from q3.config import YEAR_END_BOUNDARY_A, YEAR_END_BOUNDARY_B, YEAR_END_SOC_A_KWH, YEAR_END_SOC_B_KWH
+        from q3.full_annual import parse_boundaries
+
+        both = parse_boundaries("both")
+        self.assertEqual(len(both), 2)
+        self.assertEqual(both[0], (YEAR_END_BOUNDARY_A, YEAR_END_SOC_A_KWH))
+        self.assertEqual(both[1], (YEAR_END_BOUNDARY_B, YEAR_END_SOC_B_KWH))
+        self.assertEqual(parse_boundaries("A"), ((YEAR_END_BOUNDARY_A, YEAR_END_SOC_A_KWH),))
+        self.assertEqual(parse_boundaries("B"), ((YEAR_END_BOUNDARY_B, YEAR_END_SOC_B_KWH),))
+
+    def test_continuity_audit_requires_365_independent_paths(self) -> None:
+        import pandas as pd
+
+        from q3.full_annual import continuity_audit
+
+        dates = pd.date_range("2025-01-01", "2025-12-31", freq="D").strftime("%Y-%m-%d")
+        rows = []
+        soc = 6000.0
+        for date in dates:
+            end = 1200.0 if date == "2025-12-31" else soc + 1.0
+            rows.append(
+                {
+                    "date": date,
+                    "strategy": "M0",
+                    "year_end_boundary": "A_q2_aligned",
+                    "year_end_soc_kwh": 1200.0,
+                    "soc_start_kwh": soc,
+                    "soc_end_kwh": end,
+                }
+            )
+            soc = end
+        audit = continuity_audit(pd.DataFrame(rows))
+        self.assertTrue(audit["all_pass"])
+        self.assertEqual(audit["paths"][0]["n_days"], 365)
+
+
+@unittest.skipUnless(ATTACH1.exists() and ATTACH3.exists(), "C-problem attachments unavailable")
+class FullAnnualAttachmentTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.data = load_q3_data()
+
+    def test_annual_calendar_and_jan1_fallback(self) -> None:
+        from q3.full_annual import annual_dates, write_annual_forecast_audit
+
+        dates = annual_dates(self.data)
+        self.assertEqual(len(dates), 365)
+        self.assertEqual(dates[0], "2025-01-01")
+        self.assertEqual(dates[-1], "2025-12-31")
+        audit = write_annual_forecast_audit(self.data, Path("/tmp/q3_annual_forecast_audit_test.csv"))
+        self.assertTrue(bool(audit.loc[0, "used_attachment1_fallback"]))
+        self.assertTrue(bool(audit["source_cutoff_ok"].all()))
+        self.assertTrue((audit["max_source_index"] < audit["day_index"]).all())
+
+
 if __name__ == "__main__":
     unittest.main()

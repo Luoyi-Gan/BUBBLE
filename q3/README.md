@@ -116,3 +116,20 @@ export CUMCM_C_ATTACH_DIR=/path/to/C题/附件
 .venv/bin/python q3/validate_q3_terminal_soc_pilot.py
 ```
 
+## 全年连续 SOC（A 与 B 分列运行）
+
+依据 `docs/handoff/cursor-c-q3-annual-continuous-soc.md`。A=1200 与 B=6000
+各自从 2025-01-01 的 6000 kWh 出发，策略之间不共享 SOC。主口径仍为
+`causal_load_main` + `linear_anchor_main` + `anchor_final_main`。结果写入
+`output/q3_full_annual/` 与 `fig/q3_full_annual/`，**不覆盖**已验收目录，
+**不**生成 `result3.xlsx`，**不**把两案合成一个正式主结论。
+
+```bash
+export CUMCM_C_ATTACH_DIR=/path/to/C题/附件
+.venv/bin/python -m unittest q3.test_q3 -v
+.venv/bin/python q3/run_q3_full_annual.py --boundary both
+.venv/bin/python q3/validate_q3_full_annual.py
+```
+
+也可只跑一案：`--boundary A` 或 `--boundary B`。
+
