@@ -143,6 +143,134 @@ class Q2PilotTests(unittest.TestCase):
         self.assertTrue(np.all(result.x <= q + 1e-6))
 
 
+class Q2PolicyConsistentTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        if not ATTACH1.exists() or not ATTACH2.exists():
+            raise unittest.SkipTest("C-problem attachments unavailable")
+        cls.data = load_q2_data()
+        from q2.policy_consistent import (
+            ForecastMode,
+            build_forecast_archive_mode,
+        )
+
+        cls.archive = build_forecast_archive_mode(cls.data, ForecastMode.M1)
+
+    def test_baseline_plan_has_no_scenario_battery(self) -> None:
+        from q2.optimization import solve_baseline_plan
+
+        price = np.array([0.4, 0.8, 1.2])
+        load = np.array([20.0, 18.0, 22.0])
+        pv = np.array([2.0, 8.0, 1.0])
+        q_floor = np.array([1.0, 0.0, 3.0])
+        result = solve_baseline_plan(price, load, pv, 6000.0, q_floor=q_floor)
+        self.assertFalse(result.has_scenario_specific_battery)
+        for name in ("charge", "discharge"):
+            self.assertEqual(result.variable_shapes[name], (3,))
+        self.assertEqual(result.variable_shapes["soc"], (4,))
+        self.assertTrue(np.all(result.q + 1e-8 >= q_floor))
+        self.assertNotIn((8, 144), result.variable_shapes.values())
+        self.assertTrue(all(len(shape) == 1 for shape in result.variable_shapes.values()))
+
+    def test_forecast_modes_export_prior_sources(self) -> None:
+        from q2.policy_consistent import FORECAST_MODES, forecast_as_of_mode
+
+        i = 31
+        for mode in FORECAST_MODES:
+            forecast = forecast_as_of_mode(self.data, i, i, mode)
+            self.assertTrue(all(j < i for j in forecast.load_sources + forecast.pv_sources))
+            self.assertEqual(len(forecast.load_hat), 144)
+            self.assertFalse(forecast.load_fallback)
+            self.assertFalse(forecast.pv_fallback)
+
+    def test_residual_pool_and_medoids_are_strictly_prior(self) -> None:
+        from q2.policy_consistent import k8_scenarios
+
+        scenarios = k8_scenarios(31, self.data, self.archive)
+        self.assertIsNotNone(scenarios)
+        assert scenarios is not None
+        self.assertTrue(np.all(scenarios.pool_indices < 31))
+        self.assertTrue(np.all(scenarios.medoid_indices < 31))
+        self.assertEqual(len(scenarios.probabilities), 8)
+
+    def test_future_actual_perturbation_does_not_change_earlier_actions(self) -> None:
+        from dataclasses import replace
+
+        from q2.policy_consistent import plan_closed_loop_day
+
+        i = 31
+        summary_a, frame_a, plan_a, _floor_a, _scenarios_a = plan_closed_loop_day(
+            self.data, self.archive, i, 6000.0, mpc_periods=8
+        )
+        load = self.data.load.copy()
+        pv = self.data.pv.copy()
+        load[i, 8:] += 99999.0
+        pv[i, 8:] += 88888.0
+        poisoned = replace(self.data, load=load, pv=pv)
+        summary_b, frame_b, plan_b, _floor_b, _scenarios_b = plan_closed_loop_day(
+            poisoned, self.archive, i, 6000.0, mpc_periods=8
+        )
+        self.assertTrue(np.allclose(plan_a.q, plan_b.q, atol=1e-8))
+        self.assertEqual(summary_a["planned_q_sha256"], summary_b["planned_q_sha256"])
+        cols = [
+            "planned_q_kwh",
+            "actual_x_kwh",
+            "charge_kwh",
+            "discharge_kwh",
+            "emergency_kwh",
+            "curtailment_kwh",
+            "soc_kwh",
+        ]
+        self.assertTrue(np.allclose(frame_a[cols].to_numpy(), frame_b[cols].to_numpy(), atol=1e-6))
+
+    def test_closed_loop_physical_invariants(self) -> None:
+        from q2.config import E_MAX_KWH, E_MIN_KWH, NUMERIC_TOL, POWER_LIMIT_KWH, SIMULTANEOUS_CD_TOL
+        from q2.pilot import planned_q_hash
+        from q2.policy_consistent import plan_closed_loop_day
+
+        summary, frame, plan, _floor, _scenarios = plan_closed_loop_day(
+            self.data, self.archive, 31, 6000.0, mpc_periods=12
+        )
+        q = frame["planned_q_kwh"].to_numpy()
+        self.assertEqual(planned_q_hash(plan.q[:12]), planned_q_hash(q))
+        self.assertLess(float(np.max(frame["actual_x_kwh"].to_numpy() - q)), NUMERIC_TOL)
+        residual = (
+            frame["actual_x_kwh"]
+            + frame["emergency_kwh"]
+            + frame["pv_kwh"]
+            - frame["curtailment_kwh"]
+            + frame["discharge_kwh"]
+            - frame["load_kwh"]
+            - frame["charge_kwh"]
+        )
+        self.assertLess(float(residual.abs().max()), NUMERIC_TOL)
+        self.assertGreaterEqual(frame["soc_kwh"].min(), E_MIN_KWH - NUMERIC_TOL)
+        self.assertLessEqual(frame["soc_kwh"].max(), E_MAX_KWH + NUMERIC_TOL)
+        self.assertLessEqual(
+            float((frame["charge_kwh"] * frame["discharge_kwh"]).max()),
+            SIMULTANEOUS_CD_TOL,
+        )
+        self.assertLessEqual(frame["charge_kwh"].max(), POWER_LIMIT_KWH + NUMERIC_TOL)
+        self.assertTrue(summary["pass"])
+        self.assertFalse(summary["used_full_day_actual_lp"])
+        self.assertFalse(plan.has_scenario_specific_battery)
+
+    def test_february_soc_boundary_only_changes_registered_state(self) -> None:
+        from q2.policy_consistent import plan_closed_loop_day
+
+        i = 31
+        low = plan_closed_loop_day(self.data, self.archive, i, 5000.0, mpc_periods=4)
+        high = plan_closed_loop_day(self.data, self.archive, i, 7000.0, mpc_periods=4)
+        self.assertEqual(low[0]["load_source_dates"], high[0]["load_source_dates"])
+        self.assertEqual(low[0]["pv_source_dates"], high[0]["pv_source_dates"])
+        self.assertEqual(low[0]["forecast_mode"], high[0]["forecast_mode"])
+        self.assertEqual(low[0]["risk_alpha"], high[0]["risk_alpha"])
+        self.assertAlmostEqual(low[0]["risk_q_floor_kwh"], high[0]["risk_q_floor_kwh"], places=8)
+        self.assertAlmostEqual(low[0]["soc_start_kwh"], 5000.0)
+        self.assertAlmostEqual(high[0]["soc_start_kwh"], 7000.0)
+        self.assertNotAlmostEqual(low[0]["soc_end_kwh"], high[0]["soc_end_kwh"], places=3)
+
+
 if __name__ == "__main__":
     unittest.main()
 

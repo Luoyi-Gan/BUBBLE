@@ -16,6 +16,7 @@ ATTACH2 = ATTACH_DIR / "附件2.xlsx"
 OUTPUT_DIR = ROOT / "output" / "q2_pilot"
 FULL_OUTPUT_DIR = ROOT / "output" / "q2_full_linked"
 FULL_K8_RISK_OUTPUT_DIR = ROOT / "output" / "q2_full_k8_risk"
+POLICY_CONSISTENT_OUTPUT_DIR = ROOT / "output" / "q2_policy_consistent"
 FIG_DIR = ROOT / "fig" / "q2_pilot"
 
 T = 144

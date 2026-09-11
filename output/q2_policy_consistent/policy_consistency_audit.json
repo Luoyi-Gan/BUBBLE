@@ -1,0 +1,31 @@
+{
+  "stage": "C2-R1",
+  "policy": "single baseline-forecast day-ahead LP plus K=8 risk reserve and residual-matching 10-minute MPC",
+  "forecast_mode_main_path": "m1",
+  "risk_alpha_main_path": 0.6,
+  "scenario_k": 8,
+  "k_used_for": [
+    "risk_reserve_R",
+    "intra_day_residual_weights"
+  ],
+  "k_not_used_for": [
+    "scenario_specific_charge",
+    "scenario_specific_discharge",
+    "scenario_specific_soc",
+    "full_path_scenario_storage_recourse"
+  ],
+  "calibration_closed_loop": false,
+  "annual_run": false,
+  "candidate_result2_xlsx": false,
+  "validation_uses_full_day_actual_lp": false,
+  "formal_execution_uses_full_day_actual_lp": false,
+  "forecast_history_strictly_prior": true,
+  "residual_pool_strictly_prior": true,
+  "current_period_actuals_only": true,
+  "soc_source_r1": "isolated E_INITIAL=6000 kWh; January warmup is deferred to C2-R3",
+  "dates": [
+    "2025-02-01",
+    "2025-06-21"
+  ],
+  "elapsed_seconds": 5.08896049996838
+}

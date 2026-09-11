@@ -1,0 +1,132 @@
+{
+  "status": "PASS",
+  "stage": "C2-R1",
+  "days": [
+    {
+      "date": "2025-02-01",
+      "planned_cost_yuan": 22825.124504174786,
+      "emergency_cost_yuan": 0.0,
+      "total_cost_yuan": 22825.124504174786,
+      "planned_q_kwh": 44450.56067604255,
+      "planned_q_sha256": "5f85a87d0cd494b141d13681559ef18b0fa06c545386f2e83298226567ed6a96",
+      "actual_x_kwh": 41390.26189297126,
+      "unused_plan_kwh": 3060.298783071291,
+      "emergency_kwh": 0.0,
+      "curtailment_kwh": 1992.0998423726478,
+      "soc_start_kwh": 6000.0,
+      "soc_end_kwh": 9094.854884186096,
+      "max_balance_residual_kwh": 1.1368683772161603e-13,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "max_x_minus_q_kwh": 0.0,
+      "mean_mpc_solve_seconds": 0.013562617717980174,
+      "total_mpc_solve_seconds": 1.953016951389145,
+      "pass": true,
+      "used_full_day_actual_lp": false,
+      "future_actuals_in_optimizer": false,
+      "forecast_mode": "m1",
+      "risk_alpha": 0.6,
+      "scenario_k": 8,
+      "risk_q_floor_kwh": 844.0082470238099,
+      "load_fallback": false,
+      "pv_fallback": false,
+      "load_source_dates": "2025-01-04;2025-01-11;2025-01-18;2025-01-25",
+      "pv_source_dates": "2025-01-25;2025-01-26;2025-01-27;2025-01-28;2025-01-29;2025-01-30;2025-01-31",
+      "residual_pool_end_date": "2025-01-31",
+      "medoid_dates": "2025-01-04;2025-01-05;2025-01-07;2025-01-09;2025-01-18;2025-01-20;2025-01-22;2025-01-29",
+      "day_ahead_variable_shapes": {
+        "q": [
+          144
+        ],
+        "emergency": [
+          144
+        ],
+        "terminal_value": [],
+        "x": [
+          144
+        ],
+        "soc": [
+          145
+        ],
+        "charge": [
+          144
+        ],
+        "discharge": [
+          144
+        ],
+        "curtailment": [
+          144
+        ]
+      },
+      "has_scenario_specific_battery": false,
+      "day_ahead_solve_seconds": 0.009294375020544976,
+      "day_ahead_expected_emergency_cost_yuan": 0.0,
+      "day_ahead_virtual_next_day_value_yuan": 51559.08610817998,
+      "soc_source": "R1_isolated_E_INITIAL_6000",
+      "stage": "C2-R1"
+    },
+    {
+      "date": "2025-06-21",
+      "planned_cost_yuan": 19830.286621183135,
+      "emergency_cost_yuan": 4711.845812461264,
+      "total_cost_yuan": 24542.1324336444,
+      "planned_q_kwh": 35751.26279257298,
+      "planned_q_sha256": "8d0a2862c2e5cc5aa6ef8dbdb11f45494e85957b7ff301656366aad555c1ad9e",
+      "actual_x_kwh": 33575.06260639523,
+      "unused_plan_kwh": 2176.200186177758,
+      "emergency_kwh": 1400.414748856251,
+      "curtailment_kwh": 11895.85697527009,
+      "soc_start_kwh": 6000.0,
+      "soc_end_kwh": 8026.258763714298,
+      "max_balance_residual_kwh": 2.2737367544323206e-13,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "max_x_minus_q_kwh": 0.0,
+      "mean_mpc_solve_seconds": 0.013269540149647381,
+      "total_mpc_solve_seconds": 1.9108137815492228,
+      "pass": true,
+      "used_full_day_actual_lp": false,
+      "future_actuals_in_optimizer": false,
+      "forecast_mode": "m1",
+      "risk_alpha": 0.6,
+      "scenario_k": 8,
+      "risk_q_floor_kwh": 7438.05962142857,
+      "load_fallback": false,
+      "pv_fallback": false,
+      "load_source_dates": "2025-05-24;2025-05-31;2025-06-07;2025-06-14",
+      "pv_source_dates": "2025-06-14;2025-06-15;2025-06-16;2025-06-17;2025-06-18;2025-06-19;2025-06-20",
+      "residual_pool_end_date": "2025-06-20",
+      "medoid_dates": "2025-05-25;2025-05-29;2025-06-01;2025-06-02;2025-06-04;2025-06-07;2025-06-08;2025-06-12",
+      "day_ahead_variable_shapes": {
+        "q": [
+          144
+        ],
+        "emergency": [
+          144
+        ],
+        "terminal_value": [],
+        "x": [
+          144
+        ],
+        "soc": [
+          145
+        ],
+        "charge": [
+          144
+        ],
+        "discharge": [
+          144
+        ],
+        "curtailment": [
+          144
+        ]
+      },
+      "has_scenario_specific_battery": false,
+      "day_ahead_solve_seconds": 0.009352041990496218,
+      "day_ahead_expected_emergency_cost_yuan": 0.0,
+      "day_ahead_virtual_next_day_value_yuan": 40965.357131317476,
+      "soc_source": "R1_isolated_E_INITIAL_6000",
+      "stage": "C2-R1"
+    }
+  ],
+  "protected_outputs_unchanged": true,
+  "candidate_result2_xlsx": false
+}
