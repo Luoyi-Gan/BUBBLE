@@ -2,7 +2,7 @@
 
 **接收人：** Cursor  
 **模型负责人：** Codex  
-**状态：** 可开始试算；不得生成或提交正式 result2.xlsx。  
+**状态：** 已归档（历史试算任务）。后续以 `docs/specs/q2.md` 和 `docs/reviews/q2-final-delivery-audit.md` 为准；`output/result2.xlsx` 已完成并签收。
 **唯一模型来源：** docs/specs/q2.md。本任务只验证实现链路，队长签收前不将任何试算结果称为 Q2 正式答案。
 
 ## 1. 修改范围
