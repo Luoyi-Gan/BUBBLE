@@ -36,8 +36,11 @@ EXPECTED_EMERGENCY_CHANGE_KWH = -120_809.11
 
 BLUE = "#276FBF"
 RED = "#C0392B"
-GRAY = "#777777"
-BLACK = "#202020"
+GRAY = "#6B7280"
+BLACK = "#1F2933"
+LIGHT_BLUE = "#E8F1FA"
+LIGHT_RED = "#F8E7E5"
+LIGHT_GRAY = "#F3F4F6"
 
 
 def file_hash(path: Path) -> str:
@@ -72,6 +75,7 @@ def configure_style() -> str:
             "axes.titlesize": 12,
             "axes.labelsize": 10,
             "legend.fontsize": 9,
+            "axes.titleweight": "medium",
             "pdf.fonttype": 42,
         }
     )
@@ -98,13 +102,23 @@ def draw_box(
         (x, y),
         width,
         height,
-        boxstyle="round,pad=0.012,rounding_size=0.018",
-        linewidth=1.4,
+        boxstyle="round,pad=0.012,rounding_size=0.02",
+        linewidth=1.15,
         edgecolor=BLACK,
         facecolor=facecolor,
     )
     ax.add_patch(patch)
-    ax.text(x + width / 2, y + height / 2, text, ha="center", va="center", linespacing=1.45)
+    ax.text(x + width / 2, y + height / 2, text, ha="center", va="center", linespacing=1.38)
+
+
+def style_axes(ax: plt.Axes, hide_right: bool = True) -> None:
+    ax.spines["top"].set_visible(False)
+    if hide_right:
+        ax.spines["right"].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color(GRAY)
+        ax.spines[side].set_linewidth(0.8)
+    ax.tick_params(color=GRAY, length=3.5)
 
 
 def draw_arrow(
@@ -112,37 +126,40 @@ def draw_arrow(
     start: tuple[float, float],
     end: tuple[float, float],
     label: str,
-    label_y_offset: float = 0.18,
+    label_y: float,
 ) -> None:
     ax.add_patch(
         FancyArrowPatch(
             start,
             end,
             arrowstyle="-|>",
-            mutation_scale=13,
-            linewidth=1.4,
+            mutation_scale=12,
+            linewidth=1.25,
             color=BLACK,
-            shrinkA=3,
-            shrinkB=3,
+            shrinkA=2,
+            shrinkB=2,
         )
     )
     ax.text(
         (start[0] + end[0]) / 2,
-        (start[1] + end[1]) / 2 + label_y_offset,
+        label_y,
         label,
         ha="center",
         va="bottom",
-        fontsize=9,
+        fontsize=8.8,
+        color=BLACK,
+        bbox={"boxstyle": "round,pad=0.12", "facecolor": "white", "edgecolor": "none", "alpha": 0.95},
     )
 
 
 def plot_f1() -> None:
-    fig, ax = plt.subplots(figsize=(15.0, 5.0))
+    fig, ax = plt.subplots(figsize=(15.6, 6.5))
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
     ax.axis("off")
-    y, width, height = 0.42, 0.16, 0.28
-    xs = [0.02, 0.22, 0.42, 0.62, 0.82]
+    y, width, height = 0.48, 0.148, 0.30
+    gap = 0.055
+    xs = [0.020 + index * (width + gap) for index in range(5)]
     texts = [
         "历史负荷—光伏\n配对残差\n（仅已结束日）",
         "日前预测\n8 个联合情景\n风险分位购电下限",
@@ -150,7 +167,7 @@ def plot_f1() -> None:
         "每 10 分钟观测实际值\n更新 $x,c,d,e$\n仅执行当前一步",
         "实际日末 SOC\n$E_{d,144}$\n传至下一日",
     ]
-    faces = ["#E9EEF5", "#DDEAF7", "#DDEAF7", "#FBE7E5", "#E9EEF5"]
+    faces = [LIGHT_GRAY, LIGHT_BLUE, LIGHT_BLUE, LIGHT_RED, LIGHT_GRAY]
     for x, text, face in zip(xs, texts, faces):
         draw_box(ax, x, y, width, height, text, face)
     labels = [
@@ -165,35 +182,46 @@ def plot_f1() -> None:
             (xs[index] + width, y + height / 2),
             (xs[index + 1], y + height / 2),
             labels[index],
+            y + height + 0.035,
         )
-    ax.text(
-        xs[3] + width / 2,
-        y - 0.08,
-        "日内仅修正储能动作与实际取用；紧急购电 $e$ 只补当期缺口",
-        ha="center",
-        color=RED,
-        fontsize=9.5,
-    )
-    return_arrow = FancyArrowPatch(
-        (xs[4] + width / 2, y),
-        (xs[1] + width / 2, y),
-        connectionstyle="arc3,rad=-0.42",
-        arrowstyle="-|>",
-        mutation_scale=13,
-        linewidth=1.4,
-        linestyle="--",
+    mid_y = 0.30
+    ax.plot(
+        [xs[4] + width / 2, xs[4] + width / 2, xs[1] + width / 2, xs[1] + width / 2],
+        [y, mid_y, mid_y, y],
         color=BLUE,
+        linestyle="--",
+        linewidth=1.25,
+        solid_capstyle="round",
     )
-    ax.add_patch(return_arrow)
+    ax.annotate(
+        "",
+        xy=(xs[1] + width / 2, y),
+        xytext=(xs[1] + width / 2, mid_y + 0.01),
+        arrowprops={"arrowstyle": "-|>", "color": BLUE, "lw": 1.25},
+    )
     ax.text(
-        0.60,
-        0.11,
+        (xs[1] + xs[4] + width) / 2,
+        mid_y - 0.055,
         "次日 0:00 重新预测并锁定自己的购电计划；不提前锁定次日 $q$",
         ha="center",
         color=BLUE,
-        fontsize=9.5,
+        fontsize=9.2,
     )
-    ax.set_title("Q2 日前计划—日内执行—跨日 SOC 闭环机制", pad=15, fontweight="bold")
+    ax.text(
+        0.5,
+        0.09,
+        "日内仅修正储能动作与实际取用；紧急购电 $e$ 只补当期缺口",
+        ha="center",
+        color=RED,
+        fontsize=9.2,
+        bbox={
+            "boxstyle": "round,pad=0.32",
+            "facecolor": LIGHT_RED,
+            "edgecolor": RED,
+            "linewidth": 0.6,
+        },
+    )
+    ax.set_title("Q2 日前计划—日内执行—跨日 SOC 闭环机制", pad=10)
     save_figure(fig, "fig_q2_closed_loop")
 
 
@@ -228,59 +256,101 @@ def plot_f2(k8: pd.DataFrame, dynamic: pd.DataFrame) -> dict:
             f"{cost_change}, {emergency_change}"
         )
 
-    fig, ax = plt.subplots(figsize=(9.0, 6.0))
+    fig, ax = plt.subplots(figsize=(9.6, 6.9))
     x = np.arange(2)
+    bar_width = 0.48
     ax.bar(
         x,
         planned,
-        width=0.55,
+        width=bar_width,
         color=BLUE,
         edgecolor=BLACK,
-        linewidth=0.8,
+        linewidth=0.7,
         label="计划购电费",
+        zorder=3,
     )
     ax.bar(
         x,
         emergency_cost,
-        width=0.55,
+        width=bar_width,
         bottom=planned,
         color="white",
         edgecolor=RED,
-        linewidth=1.3,
+        linewidth=1.15,
         hatch="///",
         label="紧急购电费",
+        zorder=3,
     )
-    for index, value in enumerate(total):
+    for index, (plan, emergency, value) in enumerate(zip(planned, emergency_cost, total)):
+        ax.text(
+            x[index],
+            plan * 0.52,
+            f"{plan / 1e6:.2f} 百万",
+            ha="center",
+            va="center",
+            color="white",
+            fontsize=9.5,
+            zorder=4,
+        )
+        ax.text(
+            x[index],
+            plan + emergency * 0.55,
+            f"{emergency / 1e6:.2f} 百万",
+            ha="center",
+            va="center",
+            color=RED,
+            fontsize=8.6,
+            zorder=4,
+            bbox={
+                "boxstyle": "round,pad=0.12",
+                "facecolor": "white",
+                "edgecolor": "none",
+                "alpha": 0.9,
+            },
+        )
         ax.text(
             x[index],
             value + total.max() * 0.018,
-            f"{value:,.2f} 元",
+            f"合计 {value:,.2f} 元",
             ha="center",
             va="bottom",
-            fontweight="bold",
+            fontsize=9.6,
+            zorder=4,
+            clip_on=False,
         )
-    ax.text(
-        0.5,
-        total.max() * 0.70,
-        f"K=8 相对原动态 K\n总成本变化 {cost_change:,.2f} 元\n"
-        f"紧急购电量变化 {emergency_change:,.2f} kWh",
-        ha="center",
-        va="center",
-        bbox={"boxstyle": "round,pad=0.4", "facecolor": "white", "edgecolor": GRAY},
-    )
     ax.set_xticks(x, names)
     ax.set_ylabel("2—12 月购电成本（元）")
-    ax.set_title("Q2 两套日前风险处理策略的成本构成对照", fontweight="bold")
+    ax.set_title("Q2 两套日前风险处理策略的成本构成对照", pad=18)
     ax.yaxis.set_major_formatter(FuncFormatter(lambda value, _pos: f"{value / 1e6:.1f} 百万"))
-    ax.set_ylim(0, total.max() * 1.13)
-    ax.grid(axis="y", linestyle=":", color=GRAY, alpha=0.45)
-    ax.legend(loc="upper left", frameon=False)
-    ax.text(
-        0.0,
-        -0.17,
+    ax.set_ylim(0, total.max() * 1.12)
+    ax.set_xlim(-0.55, 1.55)
+    ax.grid(axis="y", linestyle=":", color=GRAY, alpha=0.35, zorder=0)
+    ax.set_axisbelow(True)
+    style_axes(ax)
+    ax.legend(
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.01),
+        ncol=2,
+        frameon=False,
+        borderaxespad=0.0,
+    )
+    fig.subplots_adjust(bottom=0.22, top=0.86)
+    fig.text(
+        0.5,
+        0.085,
+        f"K=8 相对原动态 K：总成本变化 {cost_change:,.2f} 元；"
+        f"紧急购电量变化 {emergency_change:,.2f} kWh",
+        ha="center",
+        fontsize=9.5,
+        bbox={"boxstyle": "round,pad=0.38", "facecolor": LIGHT_GRAY, "edgecolor": GRAY},
+    )
+    fig.text(
+        0.5,
+        0.02,
         "注：仅比较两套日前风险处理策略；不表示储能净收益或投资成本节省。",
-        transform=ax.transAxes,
+        ha="center",
         fontsize=9,
+        color=GRAY,
     )
     save_figure(fig, "fig_q2_cost_comparison")
     return {
@@ -360,16 +430,27 @@ def plot_f3(k8: pd.DataFrame, price: np.ndarray) -> dict:
     if len(price) != 144:
         raise AssertionError("F3 recovered tariff must contain 144 raw-order values")
 
-    fig, axes = plt.subplots(3, 1, figsize=(12.0, 10.0), sharex=True)
+    fig, axes = plt.subplots(
+        3, 1, figsize=(12.6, 11.0), sharex=True, gridspec_kw={"hspace": 0.16}
+    )
+    legend_box = {
+        "frameon": True,
+        "framealpha": 0.96,
+        "edgecolor": "#E5E7EB",
+        "fancybox": False,
+        "borderpad": 0.45,
+        "handlelength": 2.2,
+    }
+
     ax = axes[0]
-    ax.plot(hours, net_load, color=BLACK, linewidth=1.4, label="实际净负荷 $L-P$")
+    ax.plot(hours, net_load, color=BLACK, linewidth=1.35, label="实际净负荷 $L-P$")
     ax.plot(hours, frame["planned_q_kwh"], color=BLUE, linewidth=1.25, label="锁定计划 $q$")
     ax.plot(
         hours,
         frame["actual_x_kwh"],
         color=GRAY,
         linestyle="--",
-        linewidth=1.2,
+        linewidth=1.15,
         label="实际普通取电 $x$",
     )
     ax.plot(
@@ -377,19 +458,25 @@ def plot_f3(k8: pd.DataFrame, price: np.ndarray) -> dict:
         frame["emergency_kwh"],
         color=RED,
         linestyle="-.",
-        linewidth=1.5,
+        linewidth=1.45,
         label="紧急购电 $e$",
     )
-    ax.fill_between(hours, 0, frame["emergency_kwh"], color=RED, alpha=0.12)
+    ax.fill_between(hours, 0, frame["emergency_kwh"], color=RED, alpha=0.12, linewidth=0)
+    ymax = max(net_load.max(), frame["planned_q_kwh"].max(), frame["emergency_kwh"].max())
+    ax.set_ylim(-0.10 * ymax, ymax * 1.22)
     ax.set_ylabel("时段电量（kWh）")
-    ax.legend(ncol=4, loc="upper center", frameon=False)
-    ax.grid(linestyle=":", color=GRAY, alpha=0.4)
+    ax.legend(loc="upper left", ncol=2, **legend_box)
+    ax.grid(linestyle=":", color=GRAY, alpha=0.32)
+    ax.set_axisbelow(True)
+    style_axes(ax)
 
     ax = axes[1]
     ax.axhline(0, color=GRAY, linewidth=0.8)
     ax.plot(hours, battery_net, color=BLACK, linewidth=1.2, label="电池净动作 $d-c$")
-    ax.fill_between(hours, 0, battery_net, color=BLACK, alpha=0.12)
+    ax.fill_between(hours, 0, battery_net, color=BLACK, alpha=0.10, linewidth=0)
     ax.set_ylabel("$d-c$（kWh）")
+    abs_max = np.max(np.abs(battery_net))
+    ax.set_ylim(-abs_max * 1.28, abs_max * 1.28)
     ax_price = ax.twinx()
     ax_price.step(
         hours,
@@ -397,32 +484,45 @@ def plot_f3(k8: pd.DataFrame, price: np.ndarray) -> dict:
         where="mid",
         color=RED,
         linestyle="--",
-        linewidth=1.1,
+        linewidth=1.15,
         label="分时电价",
     )
     ax_price.set_ylabel("电价（元/kWh）", color=RED)
+    ax_price.tick_params(axis="y", colors=RED)
+    ax_price.set_ylim(0.28, price.max() * 1.22)
+    ax_price.spines["top"].set_visible(False)
+    ax_price.spines["right"].set_color(RED)
     handles1, labels1 = ax.get_legend_handles_labels()
     handles2, labels2 = ax_price.get_legend_handles_labels()
-    ax.legend(handles1 + handles2, labels1 + labels2, loc="upper center", ncol=2, frameon=False)
-    ax.grid(linestyle=":", color=GRAY, alpha=0.4)
+    ax.legend(
+        handles1 + handles2,
+        labels1 + labels2,
+        loc="lower left",
+        **legend_box,
+    )
+    ax.grid(linestyle=":", color=GRAY, alpha=0.32)
+    ax.set_axisbelow(True)
+    style_axes(ax, hide_right=False)
 
     ax = axes[2]
     ax.plot(hours, frame["soc_kwh"], color=BLUE, linewidth=1.5, label="SOC")
-    ax.axhline(1200, color=GRAY, linestyle="--", linewidth=1.0, label="SOC 边界")
+    ax.axhline(1200, color=GRAY, linestyle="--", linewidth=1.0, label="SOC 边界 1200 / 10800 kWh")
     ax.axhline(10800, color=GRAY, linestyle="--", linewidth=1.0)
     ax.set_ylabel("SOC（kWh）")
     ax.set_xlabel("时刻")
-    ax.set_ylim(700, 11300)
-    ax.legend(loc="upper center", ncol=2, frameon=False)
-    ax.grid(linestyle=":", color=GRAY, alpha=0.4)
+    ax.set_ylim(200, 12800)
+    ax.legend(loc="center left", **legend_box)
+    ax.grid(linestyle=":", color=GRAY, alpha=0.32)
+    ax.set_axisbelow(True)
+    style_axes(ax)
     axes[-1].set_xlim(0, 24)
     axes[-1].set_xticks(np.arange(0, 25, 2))
     axes[-1].set_xticklabels([f"{hour:02d}:00" for hour in range(0, 25, 2)])
     fig.suptitle(
         f"Q2 日前—日内联动轨迹：{date:%Y-%m-%d}（紧急费用最高日）",
-        fontweight="bold",
+        y=0.98,
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.965))
+    fig.subplots_adjust(top=0.945, bottom=0.055, left=0.08, right=0.91, hspace=0.20)
     save_figure(fig, "fig_q2_representative_day")
     return {
         "selected_date": date.strftime("%Y-%m-%d"),
@@ -472,56 +572,136 @@ def plot_f4(calibration: pd.DataFrame) -> dict:
     if not causal.all():
         raise AssertionError("F4 history cutoff is not causal")
 
-    fig, ax = plt.subplots(figsize=(13.0, 5.2))
-    for index, row in selected.iterrows():
-        start = row["effective_start_date"]
-        end_exclusive = row["effective_end_date"] + pd.Timedelta(days=1)
-        if row["fixed_k"] == 1:
-            y = 0.555
-            color = GRAY
-            linestyle = "--"
-        else:
-            y = float(row["risk_alpha"])
-            color = BLUE
-            linestyle = "-"
-        ax.hlines(y, start, end_exclusive, color=color, linewidth=4.0, linestyle=linestyle)
-        ax.plot(start, y, marker="o", markersize=3.5, color=color)
-        ax.axvline(start, color=GRAY, linewidth=0.45, linestyle=":", alpha=0.55)
+    fig, ax = plt.subplots(figsize=(13.4, 6.2))
+    y_map = {None: 0, 0.6: 1, 0.7: 2, 0.8: 3, 0.9: 4}
+    ytick_labels = ["K=1 / 无风险储备", "α = 0.60", "α = 0.70", "α = 0.80", "α = 0.90"]
+    year_start = mdates.date2num(pd.Timestamp("2025-01-01").to_pydatetime())
+    year_end = mdates.date2num(pd.Timestamp("2026-01-01").to_pydatetime())
+    for y in range(5):
+        ax.barh(
+            y,
+            year_end - year_start,
+            left=year_start,
+            height=0.62,
+            color=LIGHT_GRAY,
+            edgecolor="none",
+            zorder=0,
+        )
     ax.axvspan(
         pd.Timestamp("2025-01-01"),
         pd.Timestamp("2025-01-29"),
         color=GRAY,
         alpha=0.10,
-        label="前 28 日：K=1 / 无风险储备",
+        zorder=1,
     )
+    for row in selected.itertuples():
+        start = mdates.date2num(pd.Timestamp(row.effective_start_date).to_pydatetime())
+        end = mdates.date2num(
+            (pd.Timestamp(row.effective_end_date) + pd.Timedelta(days=1)).to_pydatetime()
+        )
+        duration = int((row.effective_end_date - row.effective_start_date).days + 1)
+        if row.fixed_k == 1:
+            y = y_map[None]
+            ax.barh(
+                y,
+                end - start,
+                left=start,
+                height=0.62,
+                color="white",
+                edgecolor=BLACK,
+                linewidth=0.8,
+                hatch="///",
+                zorder=3,
+            )
+        else:
+            alpha = round(float(row.risk_alpha), 2)
+            y = y_map[alpha]
+            ax.barh(
+                y,
+                end - start,
+                left=start,
+                height=0.62,
+                color=BLUE,
+                edgecolor=BLUE,
+                linewidth=0.8,
+                zorder=3,
+            )
+            if alpha == 0.7:
+                ax.text(
+                    (start + end) / 2,
+                    y,
+                    "α=0.70",
+                    ha="center",
+                    va="center",
+                    fontsize=8.2,
+                    color="white",
+                    zorder=4,
+                )
+            elif duration == 1:
+                ax.text(
+                    start - 1.2,
+                    y,
+                    "12/31",
+                    ha="right",
+                    va="center",
+                    fontsize=8.2,
+                    color=BLACK,
+                    zorder=5,
+                    bbox={
+                        "boxstyle": "round,pad=0.12",
+                        "facecolor": "white",
+                        "edgecolor": "none",
+                        "alpha": 0.92,
+                    },
+                )
     ax.text(
-        pd.Timestamp("2025-01-15"),
-        0.575,
-        "K=1\n无风险储备",
+        mdates.date2num(pd.Timestamp("2025-01-15").to_pydatetime()),
+        0,
+        "1/1–1/28",
         ha="center",
-        va="bottom",
+        va="center",
+        fontsize=8.2,
         color=BLACK,
+        zorder=4,
+        bbox={
+            "boxstyle": "round,pad=0.12",
+            "facecolor": "white",
+            "edgecolor": "none",
+            "alpha": 0.88,
+        },
     )
-    ax.text(
-        0.995,
-        0.96,
-        "K=8 阶段候选集：α∈{0.60, 0.70, 0.80, 0.90}\n"
-        "每次仅使用此前已结束日的结果选择",
-        transform=ax.transAxes,
-        ha="right",
-        va="top",
-        bbox={"boxstyle": "round,pad=0.35", "facecolor": "white", "edgecolor": GRAY},
-    )
-    ax.set_ylim(0.53, 0.94)
-    ax.set_yticks([0.6, 0.7, 0.8, 0.9])
-    ax.set_ylabel("选定风险分位 α")
+    for unused_y in (3, 4):
+        ax.text(
+            mdates.date2num(pd.Timestamp("2025-07-01").to_pydatetime()),
+            unused_y,
+            "候选未选用",
+            ha="center",
+            va="center",
+            fontsize=8.4,
+            color=GRAY,
+            zorder=2,
+        )
+    ax.set_yticks(list(range(5)), ytick_labels)
+    ax.set_ylim(-0.55, 4.75)
+    ax.set_ylabel("政策档位")
     ax.set_xlabel("风险分位生效区间（每 14 日一块）")
-    ax.set_title("Q2 滚动风险分位的因果校准时间线", fontweight="bold")
+    ax.set_title("Q2 滚动风险分位的因果校准时间线", pad=8)
     ax.xaxis.set_major_locator(mdates.MonthLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y-%m"))
-    ax.set_xlim(pd.Timestamp("2025-01-01"), pd.Timestamp("2026-01-01"))
-    ax.grid(axis="y", linestyle=":", color=GRAY, alpha=0.45)
+    ax.set_xlim(pd.Timestamp("2025-01-01"), pd.Timestamp("2026-01-04"))
+    ax.grid(axis="x", linestyle=":", color=GRAY, alpha=0.32, zorder=0)
+    style_axes(ax)
+    fig.subplots_adjust(bottom=0.24)
     fig.autofmt_xdate(rotation=30, ha="right")
+    fig.text(
+        0.5,
+        0.04,
+        "K=8 阶段候选集 α∈{0.60, 0.70, 0.80, 0.90}；每次仅使用此前已结束日的结果选择。"
+        "12/17–12/30 为 α=0.70，12/31 回落至 α=0.60。",
+        ha="center",
+        fontsize=9,
+        bbox={"boxstyle": "round,pad=0.35", "facecolor": LIGHT_GRAY, "edgecolor": GRAY},
+    )
     save_figure(fig, "fig_q2_risk_calibration")
     return {
         "selected_blocks": len(selected),
