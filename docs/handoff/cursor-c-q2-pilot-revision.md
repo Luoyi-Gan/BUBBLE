@@ -1,6 +1,6 @@
 # Cursor 交接单：C 题 Q2 试算复核修订
 
-**状态：** 阻塞性修订；不得运行全年正式结果或生成 result2.xlsx。
+**状态：** 已归档（历史试算修订）。相关修订、全年结果与 `result2.xlsx` 已完成并签收；不得将本任务单的旧限制覆盖当前规格。
 **复核来源：** docs/reviews/q2-pilot-review.md。
 **修改范围：** 仍限 q2/、output/q2_pilot/、fig/q2_pilot/；不得改写规格或复核文档。
 

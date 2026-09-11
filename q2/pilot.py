@@ -991,15 +991,15 @@ def write_validation_report(
             "q_locked_during_day": True,
         },
         "output_guard": "No result2.xlsx is created or modified by the pilot.",
-        "open_items": [
-            "x<=q contract semantics await captain sign-off",
+        "historical_pilot_notes": [
+            "x<=q contract semantics were signed off for the production Q2 model",
             (
                 "P1 is a sequential daily perfect-information comparator, not a proven "
                 "global lower bound against a controller with a different horizon"
             ),
-            "T_max is not yet specified; timings are reported without K filtering",
+            "T_max was later fixed at 0.20 seconds per validation day for production K filtering",
             "June 21 remains an isolated pilot initialized from the comparator path",
-            "the next-day value is an adaptively certified LP cut approximation pending sign-off",
+            "the next-day value is an adaptively certified LP cut approximation signed off for Q2",
         ],
     }
     path_json.write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -1047,13 +1047,13 @@ def write_validation_report(
         ]
     lines += [""]
     lines += [
-        "## 未决口径",
+        "## 历史试算边界（已由生产模型处理）",
         "",
-        "- `x<=q` 暂定合同语义待队长签收。",
+        "- `x<=q` 合同语义已由队长签收；生产模型按计划购电量 q 计费。",
         "- P1 与主方案视域不同，因此当前只能称“逐日完美信息比较器”，不能据此强制认定全局下界。",
-        "- `T_max` 未给定，因此动态 K 只按一标准误规则选取并报告耗时。",
+        "- 生产模型已固定 `T_max=0.20` 秒/验证日，并采用 K=8 与滚动风险分位。",
         f"- 次日价值采用自适应 LP 对偶支撑切面，弦线—切面最大认证误差不超过 "
-        f"{NEXT_DAY_VALUE_GAP_TOL_YUAN:.2f} 元，待 Codex/队长签收。",
+        f"{NEXT_DAY_VALUE_GAP_TOL_YUAN:.2f} 元；该口径已在生产 Q2 中签收。",
         "- 6 月 21 日仍为孤立试算，其日初 SOC 暂取逐日比较器路径；2 月 1 日已改用联动 1 月预热末值。",
         "- 未生成或修改 `result2.xlsx`。",
     ]

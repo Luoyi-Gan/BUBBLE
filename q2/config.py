@@ -28,7 +28,7 @@ E_INITIAL_KWH = 6000.0
 POWER_LIMIT_KW = 5000.0
 POWER_LIMIT_KWH = POWER_LIMIT_KW * DELTA_H
 
-# Pending captain sign-off; keep all contract semantics here.
+# Signed-off contract semantics; keep all production Q2 assumptions here.
 CONTRACT_TAKE_MODE = "x_le_q"
 NORMAL_COST_BASIS = "planned_q"
 EMERGENCY_PRICE_MULTIPLIER = 5.0
