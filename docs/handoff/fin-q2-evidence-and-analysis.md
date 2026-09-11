@@ -2,7 +2,7 @@
 
 ## 任务状态
 
-- 状态：可开始
+- 状态：已归档。队长决策、年度计算、附件结果和交付终验均已完成；当前模型口径以 `docs/specs/q2.md` 与 `docs/reviews/q2-final-delivery-audit.md` 为准。
 - 接收人：FIN
 - 协作对象：队长（AI）负责建模决策与签收；Codex 负责模型逻辑、规格与复核；Cursor 负责代码和结果文件。
 - 本任务不授权修改：`docs/specs/`、`src/`、`output/`、`result2.xlsx`，也不替团队决定模型口径。

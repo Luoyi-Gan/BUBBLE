@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "days": 365,
+  "total_cost_yuan": 16389681.53809892,
+  "planned_cost_yuan": 13864002.10520072,
+  "emergency_cost_yuan": 2525679.4328981997,
+  "planned_q_kwh": 22767254.17250382,
+  "actual_x_kwh": 21579681.69450268,
+  "unused_plan_kwh": 1187572.478001138,
+  "emergency_kwh": 718761.5968826078,
+  "curtailment_kwh": 1342762.727294916,
+  "soc_start_kwh": 6000.0,
+  "soc_end_kwh": 1200.0,
+  "max_balance_residual_kwh": 5.203060027270112e-08,
+  "max_simultaneous_cd_kwh2": 0.0,
+  "max_x_minus_q_kwh": 0.0,
+  "max_cross_day_soc_gap_kwh": 0.0,
+  "calendar_periods": 27,
+  "all_within_time_limit": true,
+  "max_value_cut_gap_yuan": 0.9999857953589526,
+  "elapsed_seconds": 1004.3158038749825
+}
