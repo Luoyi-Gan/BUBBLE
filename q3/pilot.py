@@ -27,12 +27,16 @@ from q3.config import (
     NUMERIC_TOL,
     OUTPUT_DIR,
     PILOT_DATES,
+    PV_MAPPING_LINEAR,
+    SETTLEMENT_ALT,
+    SETTLEMENT_MAIN,
     SIMULTANEOUS_CD_TOL,
     STRATEGY_ALLOWED_UPDATES,
     STRATEGIES,
     T,
     VOI_EPS_YUAN,
     WARMUP_CSV_MAIN,
+    make_run_id,
 )
 from q3.data import Q3Data
 from q3.forecast import (
@@ -48,7 +52,9 @@ from q3.forecast import (
 from q3.optimization import (
     ValueCut,
     assert_physical,
+    decompose_settlement,
     evaluate_value_cuts,
+    realized_settlement,
     settlement_cost,
     solve_horizon,
 )
@@ -67,7 +73,7 @@ ORANGE = "#e09f3e"
 PURPLE = "#6d597a"
 
 
-ValueCutCache = dict[tuple[int, int], tuple[tuple[ValueCut, ...], list[dict]]]
+ValueCutCache = dict[tuple[int, int, str], tuple[tuple[ValueCut, ...], list[dict]]]
 
 
 @dataclass
@@ -75,9 +81,13 @@ class DayRun:
     date: str
     strategy: str
     load_information_case: str
+    pv_mapping_mode: str
+    settlement_mode: str
     with_terminal_value: bool
+    run_id: str
     dispatch: pd.DataFrame
     update_log: pd.DataFrame
+    ledger: pd.DataFrame
     summary: dict
     next_day_value_rows: list[dict] = field(default_factory=list)
 
@@ -93,13 +103,14 @@ def build_next_day_value_cuts(
     data: Q3Data,
     current_index: int,
     issue_hour: int,
+    pv_mapping_mode: str = PV_MAPPING_LINEAR,
 ) -> tuple[tuple[ValueCut, ...], list[dict]]:
     if current_index + 1 >= len(data.dates):
         return (), []
     load = causal_load_forecast(
         data, target_index=current_index + 1, history_end_exclusive=current_index
     )
-    pv = next_day_pv_forecast(data, current_index, issue_hour)
+    pv = next_day_pv_forecast(data, current_index, issue_hour, pv_mapping_mode)
     solved: dict[float, ValueCut] = {}
 
     def solve_at(soc: float) -> None:
@@ -164,12 +175,15 @@ def build_next_day_value_cuts(
             "current_date": data.dates[current_index].strftime("%Y-%m-%d"),
             "target_date": target,
             "issue_hour": issue_hour,
+            "pv_mapping_mode": pv_mapping_mode,
             "soc_sample_kwh": reference,
             "virtual_next_day_cost_yuan": value,
             "value_subgradient_yuan_per_kwh": slope,
             "certified_max_gap_yuan": gap,
             "bundle_sample_count": len(cuts),
-            "information": "Q3 attach3 overlay + causal prior-day load/PV; no future actual PV",
+            "information": (
+                f"Q3 {pv_mapping_mode} overlay + causal prior-day load/PV; no future actual PV"
+            ),
         }
         for reference, value, slope in cuts
     ]
@@ -181,16 +195,173 @@ def _index_to_update_hour(index: int) -> int | None:
     return inverse.get(index)
 
 
+def _run_key_fields(
+    date: str,
+    strategy: str,
+    load_information_case: str,
+    pv_mapping_mode: str,
+    settlement_mode: str,
+    with_terminal_value: bool,
+    run_id: str,
+) -> dict:
+    return {
+        "date": date,
+        "strategy": strategy,
+        "load_information_case": load_information_case,
+        "pv_mapping_mode": pv_mapping_mode,
+        "settlement_mode": settlement_mode,
+        "with_terminal_value": with_terminal_value,
+        "run_id": run_id,
+    }
+
+
+def _settlement_ledger_rows(
+    date: str,
+    strategy: str,
+    load_information_case: str,
+    pv_mapping_mode: str,
+    settlement_mode: str,
+    with_terminal_value: bool,
+    run_id: str,
+    time_labels: tuple[str, ...],
+    price: np.ndarray,
+    versions: list[np.ndarray],
+    version_times: list[str],
+    dispatch: pd.DataFrame,
+) -> list[dict]:
+    keys = _run_key_fields(
+        date,
+        strategy,
+        load_information_case,
+        pv_mapping_mode,
+        settlement_mode,
+        with_terminal_value,
+        run_id,
+    )
+    ordinary, up_fee, down_fee = decompose_settlement(price, versions, settlement_mode)
+    emergency = dispatch["emergency_cost_yuan"].to_numpy()
+    emergency_kwh = dispatch["emergency_kwh"].to_numpy()
+    g0 = versions[0]
+    gf = versions[-1]
+    rows: list[dict] = []
+    for t in range(T):
+        p = float(price[t])
+        rows.append(
+            {
+                **keys,
+                "row_role": "period_total",
+                "period": t,
+                "time": time_labels[t],
+                "plan_version_time": str(dispatch["last_update_time"].iloc[t]),
+                "g_before_kwh": float(g0[t]),
+                "g_after_kwh": float(gf[t]),
+                "up_adjust_kwh": float(max(gf[t] - g0[t], 0.0)),
+                "down_adjust_kwh": float(max(g0[t] - gf[t], 0.0)),
+                "ordinary_yuan": float(ordinary[t]),
+                "up_fee_yuan": float(up_fee[t]),
+                "down_fee_yuan": float(down_fee[t]),
+                "emergency_kwh": float(emergency_kwh[t]),
+                "emergency_yuan": float(emergency[t]),
+                "total_yuan": float(ordinary[t] + up_fee[t] + down_fee[t] + emergency[t]),
+            }
+        )
+        if settlement_mode == SETTLEMENT_ALT:
+            rows.append(
+                {
+                    **keys,
+                    "row_role": "event",
+                    "period": t,
+                    "time": time_labels[t],
+                    "plan_version_time": "00:00",
+                    "g_before_kwh": 0.0,
+                    "g_after_kwh": float(g0[t]),
+                    "up_adjust_kwh": float(g0[t]),
+                    "down_adjust_kwh": 0.0,
+                    "ordinary_yuan": p * float(g0[t]),
+                    "up_fee_yuan": 0.0,
+                    "down_fee_yuan": 0.0,
+                    "emergency_kwh": 0.0,
+                    "emergency_yuan": 0.0,
+                    "total_yuan": p * float(g0[t]),
+                }
+            )
+            for prev, cur, ts in zip(versions[:-1], versions[1:], version_times[1:]):
+                up = float(max(cur[t] - prev[t], 0.0))
+                down = float(max(prev[t] - cur[t], 0.0))
+                rows.append(
+                    {
+                        **keys,
+                        "row_role": "event",
+                        "period": t,
+                        "time": time_labels[t],
+                        "plan_version_time": ts,
+                        "g_before_kwh": float(prev[t]),
+                        "g_after_kwh": float(cur[t]),
+                        "up_adjust_kwh": up,
+                        "down_adjust_kwh": down,
+                        "ordinary_yuan": 0.0,
+                        "up_fee_yuan": 1.5 * p * up,
+                        "down_fee_yuan": 0.5 * p * down,
+                        "emergency_kwh": 0.0,
+                        "emergency_yuan": 0.0,
+                        "total_yuan": 1.5 * p * up + 0.5 * p * down,
+                    }
+                )
+        else:
+            up = float(max(gf[t] - g0[t], 0.0))
+            down = float(max(g0[t] - gf[t], 0.0))
+            rows.append(
+                {
+                    **keys,
+                    "row_role": "event",
+                    "period": t,
+                    "time": time_labels[t],
+                    "plan_version_time": str(dispatch["last_update_time"].iloc[t]),
+                    "g_before_kwh": float(g0[t]),
+                    "g_after_kwh": float(gf[t]),
+                    "up_adjust_kwh": up,
+                    "down_adjust_kwh": down,
+                    "ordinary_yuan": p * float(gf[t]),
+                    "up_fee_yuan": 0.5 * p * up,
+                    "down_fee_yuan": 0.5 * p * down,
+                    "emergency_kwh": 0.0,
+                    "emergency_yuan": 0.0,
+                    "total_yuan": p * float(gf[t]) + 0.5 * p * (up + down),
+                }
+            )
+        rows.append(
+            {
+                **keys,
+                "row_role": "event",
+                "period": t,
+                "time": time_labels[t],
+                "plan_version_time": "execution",
+                "g_before_kwh": float(gf[t]),
+                "g_after_kwh": float(gf[t]),
+                "up_adjust_kwh": 0.0,
+                "down_adjust_kwh": 0.0,
+                "ordinary_yuan": 0.0,
+                "up_fee_yuan": 0.0,
+                "down_fee_yuan": 0.0,
+                "emergency_kwh": float(emergency_kwh[t]),
+                "emergency_yuan": float(emergency[t]),
+                "total_yuan": float(emergency[t]),
+            }
+        )
+    return rows
+
+
 def _next_day_value_cuts(
     data: Q3Data,
     day_index: int,
     issue_hour: int,
     cache: ValueCutCache | None,
+    pv_mapping_mode: str = PV_MAPPING_LINEAR,
 ) -> tuple[tuple[ValueCut, ...], list[dict]]:
-    key = (day_index, issue_hour)
+    key = (day_index, issue_hour, pv_mapping_mode)
     if cache is not None and key in cache:
         return cache[key]
-    cuts, rows = build_next_day_value_cuts(data, day_index, issue_hour)
+    cuts, rows = build_next_day_value_cuts(data, day_index, issue_hour, pv_mapping_mode)
     if cache is not None:
         cache[key] = (cuts, rows)
     return cuts, rows
@@ -203,9 +374,19 @@ def run_day(
     initial_soc: float,
     with_terminal_value: bool = True,
     load_information_case: str = LOAD_INFORMATION_MAIN,
+    pv_mapping_mode: str = PV_MAPPING_LINEAR,
+    settlement_mode: str = SETTLEMENT_MAIN,
     value_cut_cache: ValueCutCache | None = None,
 ) -> DayRun:
     date = data.dates[day_index].strftime("%Y-%m-%d")
+    run_id = make_run_id(
+        date,
+        strategy,
+        load_information_case,
+        pv_mapping_mode,
+        settlement_mode,
+        with_terminal_value,
+    )
     allowed = STRATEGY_ALLOWED_UPDATES[strategy]
     price = data.price
     actual_load = data.load[day_index]
@@ -213,12 +394,14 @@ def run_day(
     actual_pv = data.pv[day_index]
     started = perf_counter()
 
-    mapped0 = map_issue_forecast(data, day_index, 0)
+    mapped0 = map_issue_forecast(data, day_index, 0, pv_mapping_mode)
     current_forecast = mapped0.today_kwh.copy()
     cuts: tuple[ValueCut, ...] = ()
     value_rows: list[dict] = []
     if with_terminal_value:
-        cuts, rows = _next_day_value_cuts(data, day_index, 0, value_cut_cache)
+        cuts, rows = _next_day_value_cuts(
+            data, day_index, 0, value_cut_cache, pv_mapping_mode
+        )
         value_rows.extend(rows)
 
     midnight = solve_horizon(
@@ -232,7 +415,27 @@ def run_day(
     assert_physical(midnight, plan_load, current_forecast, prefix=f"{date} 0:00 plan ")
     g0 = midnight.g.copy()
     g = g0.copy()
+    versions = [g0.copy()]
+    version_times = ["00:00"]
     last_update = "00:00"
+
+    def remaining_kwargs(t: int, g_pre_rem: np.ndarray) -> dict:
+        kwargs: dict = {
+            "settlement_mode": settlement_mode,
+            "terminal_value_cuts": cuts or None,
+            "g0": g0[t:],
+        }
+        if settlement_mode == SETTLEMENT_ALT:
+            kwargs["g_pre"] = g_pre_rem
+            kwargs["sunk_settlement"] = float(
+                np.sum(
+                    realized_settlement(
+                        price[t:], [v[t:] for v in versions], SETTLEMENT_ALT
+                    )
+                )
+            )
+        return kwargs
+
     update_rows = [
         {
             "date": date,
@@ -264,36 +467,38 @@ def run_day(
         hour = _index_to_update_hour(t)
         if hour is not None and hour in allowed:
             g_before_update = g.copy()
-            mapped = map_issue_forecast(data, day_index, hour)
+            mapped = map_issue_forecast(data, day_index, hour, pv_mapping_mode)
             current_forecast = mapped.today_kwh.copy()
             if with_terminal_value:
-                cuts, rows = _next_day_value_cuts(data, day_index, hour, value_cut_cache)
+                cuts, rows = _next_day_value_cuts(
+                    data, day_index, hour, value_cut_cache, pv_mapping_mode
+                )
                 value_rows.extend(rows)
             pv_plan = current_forecast[t:]
             load_plan = plan_load[t:]
-            g0_rem = g0[t:]
             g_pre = g[t:].copy()
+            settle_kw = remaining_kwargs(t, g_pre)
             j_fix = solve_horizon(
                 price[t:],
                 load_plan,
                 pv_plan,
                 soc,
-                g0=g0_rem,
                 g_fixed=g_pre,
-                terminal_value_cuts=cuts or None,
+                **settle_kw,
             )
             j_free = solve_horizon(
                 price[t:],
                 load_plan,
                 pv_plan,
                 soc,
-                g0=g0_rem,
-                terminal_value_cuts=cuts or None,
+                **settle_kw,
             )
             voi = float(j_fix.objective - j_free.objective)
             implemented = bool(voi > VOI_EPS_YUAN)
             if implemented:
                 g[t:] = j_free.g
+                versions.append(g.copy())
+                version_times.append(f"{hour:02d}:00")
             delta = g[t:] - g_pre
             update_rows.append(
                 {
@@ -325,9 +530,8 @@ def run_day(
             load_horizon,
             pv_horizon,
             soc,
-            g0=g0[t:],
             g_fixed=g[t:],
-            terminal_value_cuts=cuts or None,
+            **remaining_kwargs(t, g[t:]),
         )
         residual = (
             step.x[0]
@@ -375,25 +579,46 @@ def run_day(
             )
 
     dispatch = pd.DataFrame(dispatch_rows)
-    phi = settlement_cost(
-        dispatch["price"].to_numpy(),
-        dispatch["planned_g0_kwh"].to_numpy(),
-        dispatch["final_g_kwh"].to_numpy(),
-    )
+    phi = realized_settlement(price, versions, settlement_mode)
     dispatch["phi_yuan"] = phi
     dispatch["emergency_cost_yuan"] = (
         EMERGENCY_PRICE_MULTIPLIER * dispatch["price"] * dispatch["emergency_kwh"]
     )
+    dispatch["run_id"] = run_id
+    dispatch["pv_mapping_mode"] = pv_mapping_mode
+    dispatch["settlement_mode"] = settlement_mode
+    ledger = pd.DataFrame(
+        _settlement_ledger_rows(
+            date=date,
+            strategy=strategy,
+            load_information_case=load_information_case,
+            pv_mapping_mode=pv_mapping_mode,
+            settlement_mode=settlement_mode,
+            with_terminal_value=with_terminal_value,
+            run_id=run_id,
+            time_labels=data.time_labels,
+            price=price,
+            versions=versions,
+            version_times=version_times,
+            dispatch=dispatch,
+        )
+    )
     update_log = pd.DataFrame(update_rows)
     update_log.insert(1, "strategy", strategy)
     update_log.insert(2, "load_information_case", load_information_case)
-    update_log.insert(3, "with_terminal_value", with_terminal_value)
+    update_log.insert(3, "pv_mapping_mode", pv_mapping_mode)
+    update_log.insert(4, "settlement_mode", settlement_mode)
+    update_log.insert(5, "with_terminal_value", with_terminal_value)
+    update_log.insert(6, "run_id", run_id)
     n_adjust = int(((update_log["update_time"] != "00:00") & update_log["implemented"]).sum())
     summary = {
         "date": date,
         "strategy": strategy,
         "load_information_case": load_information_case,
+        "pv_mapping_mode": pv_mapping_mode,
+        "settlement_mode": settlement_mode,
         "with_terminal_value": with_terminal_value,
+        "run_id": run_id,
         "total_cost_yuan": float(dispatch["phi_yuan"].sum() + dispatch["emergency_cost_yuan"].sum()),
         "settlement_cost_yuan": float(dispatch["phi_yuan"].sum()),
         "emergency_cost_yuan": float(dispatch["emergency_cost_yuan"].sum()),
@@ -424,9 +649,13 @@ def run_day(
         date,
         strategy,
         load_information_case,
+        pv_mapping_mode,
+        settlement_mode,
         with_terminal_value,
+        run_id,
         dispatch,
         update_log,
+        ledger,
         summary,
         value_rows,
     )
@@ -509,12 +738,20 @@ def write_cost_audit(runs: list[DayRun], path: Path) -> pd.DataFrame:
         block["date"] = run.date
         block["strategy"] = run.strategy
         block["load_information_case"] = run.load_information_case
+        block["pv_mapping_mode"] = run.pv_mapping_mode
+        block["settlement_mode"] = run.settlement_mode
+        block["with_terminal_value"] = run.with_terminal_value
+        block["run_id"] = run.run_id
         frames.append(
             block[
                 [
                     "date",
                     "strategy",
                     "load_information_case",
+                    "pv_mapping_mode",
+                    "settlement_mode",
+                    "with_terminal_value",
+                    "run_id",
                     "time",
                     "planned_g0_kwh",
                     "final_g_kwh",
@@ -531,6 +768,10 @@ def write_cost_audit(runs: list[DayRun], path: Path) -> pd.DataFrame:
                     "date": run.date,
                     "strategy": run.strategy,
                     "load_information_case": run.load_information_case,
+                    "pv_mapping_mode": run.pv_mapping_mode,
+                    "settlement_mode": run.settlement_mode,
+                    "with_terminal_value": run.with_terminal_value,
+                    "run_id": run.run_id,
                     **item,
                 }
             )
@@ -664,7 +905,10 @@ def physical_audit(runs: list[DayRun], warmup_end_soc: float | None) -> dict:
             "date": run.date,
             "strategy": run.strategy,
             "load_information_case": run.load_information_case,
+            "pv_mapping_mode": run.pv_mapping_mode,
+            "settlement_mode": run.settlement_mode,
             "with_terminal_value": run.with_terminal_value,
+            "run_id": run.run_id,
             "max_balance_residual_kwh": run.summary["max_balance_residual_kwh"],
             "max_soc_residual_kwh": run.summary["max_soc_residual_kwh"],
             "max_simultaneous_cd_kwh2": run.summary["max_simultaneous_cd_kwh2"],

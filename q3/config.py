@@ -63,6 +63,46 @@ SIMULTANEOUS_CD_TOL = 1e-4
 SOLVER = "HIGHS"
 PILOT_DATES = ("2025-02-01", "2025-06-21")
 
+PV_MAPPING_LINEAR = "linear_anchor_main"
+PV_MAPPING_STEP = "step_hourly_sensitivity"
+PV_MAPPING_MODES = (PV_MAPPING_LINEAR, PV_MAPPING_STEP)
+
+SETTLEMENT_MAIN = "anchor_final_main"
+SETTLEMENT_ALT = "adjacent_literal_sensitivity"
+SETTLEMENT_MODES = (SETTLEMENT_MAIN, SETTLEMENT_ALT)
+
+SENSITIVITY_OUTPUT_DIR = ROOT / "output" / "q3_sensitivity"
+SENSITIVITY_FIG_DIR = ROOT / "fig" / "q3_sensitivity"
+
+
+def make_run_id(
+    date: str,
+    strategy: str,
+    load_information_case: str,
+    pv_mapping_mode: str,
+    settlement_mode: str,
+    with_terminal_value: bool,
+) -> str:
+    tv = "48h" if with_terminal_value else "no48h"
+    return (
+        f"{date}__{strategy}__{load_information_case}__"
+        f"{pv_mapping_mode}__{settlement_mode}__{tv}"
+    )
+
+
+def dispatch_stem(
+    date: str,
+    strategy: str,
+    load_information_case: str,
+    pv_mapping_mode: str,
+    settlement_mode: str,
+    with_terminal_value: bool,
+) -> str:
+    suffix = f"{strategy}_{load_information_case}_{pv_mapping_mode}_{settlement_mode}"
+    if not with_terminal_value:
+        suffix += "_no48h"
+    return f"q3_dispatch_{date}_{suffix}"
+
 # Update clock hours and the first 10-minute index that may change.
 # Index t corresponds to the period ending at (t+1)*10 minutes after 0:00.
 UPDATE_SPECS = (

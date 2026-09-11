@@ -70,3 +70,30 @@ python q3/validate_q3_pilot.py
 - `M0`：0:00 后不更新
 - `M1_M6`：6/12/18 均评估，`VoI>0.01` 元才改承诺
 - `M6_only` / `M12_only` / `M18_only`：只开放一个更新点
+
+## 映射 / 结算敏感性（RQ3-2、RQ3-4、RQ3-5）
+
+依据 `docs/handoff/cursor-c-q3-sensitivity-and-traceability.md`。结果写入
+`output/q3_sensitivity/` 与 `fig/q3_sensitivity/`，**不覆盖**已验收的 `output/q3_pilot/`。
+仍只跑 2025-02-01 与 2025-06-21；不生成 `result3.xlsx`，不实现 M5。
+
+主负荷口径固定 `causal_load_main`。四种组合：
+
+| `pv_mapping_mode` | `settlement_mode` | 角色 |
+| --- | --- | --- |
+| `linear_anchor_main` | `anchor_final_main` | 主口径 / baseline |
+| `linear_anchor_main` | `adjacent_literal_sensitivity` | 相邻版本字面累加结算 |
+| `step_hourly_sensitivity` | `anchor_final_main` | 小时阶梯映射 |
+| `step_hourly_sensitivity` | `adjacent_literal_sensitivity` | 两敏感性同时打开 |
+
+阶梯映射把“预报 k 小时”视为区间 `(H+k-1, H+k]` 的平均功率，该小时内六个 10 分钟时段取同一 kWh；不把未来真实光伏当锚点。替代结算进入 0:00 与每次更新的优化目标，而不是事后重计价。
+
+日初 SOC 复用已验收的 `output/q3_pilot/q3_warmup_daily_causal_load_main.csv`，四种组合共用。
+
+```bash
+export CUMCM_C_ATTACH_DIR=/path/to/C题/附件
+.venv/bin/python -m unittest q3.test_q3 -v
+.venv/bin/python q3/run_q3_sensitivity.py
+.venv/bin/python q3/validate_q3_sensitivity.py
+```
+

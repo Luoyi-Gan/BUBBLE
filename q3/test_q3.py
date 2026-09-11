@@ -14,6 +14,10 @@ from q3.config import (
     HOUR_TO_FIRST_MUTABLE,
     LOAD_INFORMATION_MAIN,
     LOAD_INFORMATION_PROXY,
+    PV_MAPPING_LINEAR,
+    PV_MAPPING_STEP,
+    SETTLEMENT_ALT,
+    SETTLEMENT_MAIN,
     T,
 )
 from q3.data import load_q3_data, period_end_minutes
@@ -26,7 +30,7 @@ from q3.forecast import (
     map_issue_forecast,
     planning_load_curve,
 )
-from q3.optimization import settlement_cost, solve_horizon
+from q3.optimization import realized_settlement, settlement_cost, solve_horizon
 
 
 class SettlementTests(unittest.TestCase):
@@ -204,6 +208,81 @@ class CausalLoadAttachmentTests(unittest.TestCase):
             self.data.load[i] = original
         np.testing.assert_allclose(g0_main_before, g0_main_after, atol=1e-6)
         self.assertGreater(float(np.max(np.abs(g0_proxy_after - g0_proxy_before))), 1e-6)
+
+
+class AdjacentSettlementTests(unittest.TestCase):
+    def test_four_settlement_paths(self) -> None:
+        p = np.array([2.0])
+        g0 = np.array([10.0])
+        none = realized_settlement(p, [g0], SETTLEMENT_MAIN)
+        up = realized_settlement(p, [g0, np.array([14.0])], SETTLEMENT_MAIN)
+        down = realized_settlement(p, [g0, np.array([6.0])], SETTLEMENT_MAIN)
+        self.assertAlmostEqual(float(none[0]), 2.0 * 10.0)
+        self.assertAlmostEqual(float(up[0]), 2.0 * 14.0 + 0.5 * 2.0 * 4.0)
+        self.assertAlmostEqual(float(down[0]), 2.0 * 6.0 + 0.5 * 2.0 * 4.0)
+
+        alt_none = realized_settlement(p, [g0], SETTLEMENT_ALT)
+        alt_up = realized_settlement(p, [g0, np.array([14.0])], SETTLEMENT_ALT)
+        alt_down = realized_settlement(p, [g0, np.array([6.0])], SETTLEMENT_ALT)
+        alt_up_down = realized_settlement(
+            p, [g0, np.array([14.0]), np.array([6.0])], SETTLEMENT_ALT
+        )
+        self.assertAlmostEqual(float(alt_none[0]), 2.0 * 10.0)
+        self.assertAlmostEqual(float(alt_up[0]), 2.0 * 10.0 + 1.5 * 2.0 * 4.0)
+        self.assertAlmostEqual(float(alt_down[0]), 2.0 * 10.0 + 0.5 * 2.0 * 4.0)
+        self.assertAlmostEqual(
+            float(alt_up_down[0]), 2.0 * 10.0 + 1.5 * 2.0 * 4.0 + 0.5 * 2.0 * 8.0
+        )
+        main_up_down = realized_settlement(
+            p, [g0, np.array([14.0]), np.array([6.0])], SETTLEMENT_MAIN
+        )
+        self.assertAlmostEqual(float(main_up_down[0]), float(down[0]))
+        self.assertLess(float(main_up_down[0]), float(alt_up_down[0]) - 1e-9)
+
+
+@unittest.skipUnless(ATTACH1.exists() and ATTACH3.exists(), "C-problem attachments unavailable")
+class MappingSensitivityTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.data = load_q3_data()
+
+    def test_linear_first_hour_weights(self) -> None:
+        i = self.data.date_index("2025-02-01")
+        mapped = map_issue_forecast(self.data, i, 6, PV_MAPPING_LINEAR)
+        anchor = self.data.pv[i, 35] / DELTA_H
+        first = self.data.hourly_forecast_kw[6][i, 0]
+        expected_610 = (5.0 / 6.0 * anchor + 1.0 / 6.0 * first) * DELTA_H
+        self.assertAlmostEqual(mapped.today_kwh[36], expected_610, places=6)
+        self.assertAlmostEqual(mapped.today_kwh[41], first * DELTA_H, places=6)
+
+    def test_step_first_hour_is_forecast_hour_one(self) -> None:
+        i = self.data.date_index("2025-02-01")
+        mapped = map_issue_forecast(self.data, i, 6, PV_MAPPING_STEP)
+        first = self.data.hourly_forecast_kw[6][i, 0] * DELTA_H
+        for t in range(36, 42):
+            self.assertAlmostEqual(mapped.today_kwh[t], first, places=6)
+            self.assertEqual(int(mapped.today_source_k[t]), 1)
+        self.assertEqual(mapped.first_mutable_index, 36)
+        self.assertAlmostEqual(mapped.today_kwh[35], self.data.pv[i, 35])
+
+    def test_neither_mapping_reads_future_actual_pv(self) -> None:
+        i = self.data.date_index("2025-06-21")
+        original = self.data.pv[i].copy()
+        befores = {
+            mode: map_issue_forecast(self.data, i, 6, mode)
+            for mode in (PV_MAPPING_LINEAR, PV_MAPPING_STEP)
+        }
+        try:
+            self.data.pv[i, 36:] += 9999.0
+            afters = {
+                mode: map_issue_forecast(self.data, i, 6, mode)
+                for mode in (PV_MAPPING_LINEAR, PV_MAPPING_STEP)
+            }
+        finally:
+            self.data.pv[i] = original
+        for mode in (PV_MAPPING_LINEAR, PV_MAPPING_STEP):
+            np.testing.assert_allclose(befores[mode].today_kwh[36:], afters[mode].today_kwh[36:])
+            np.testing.assert_allclose(befores[mode].next_day_kwh, afters[mode].next_day_kwh)
 
 
 if __name__ == "__main__":

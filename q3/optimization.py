@@ -15,6 +15,8 @@ from q3.config import (
     ETA_D,
     MPC_COST_TOL,
     POWER_LIMIT_KWH,
+    SETTLEMENT_ALT,
+    SETTLEMENT_MAIN,
     SIMULTANEOUS_CD_TOL,
     SOLVER,
 )
@@ -24,11 +26,67 @@ ValueCut = tuple[float, float, float]  # reference SOC, value, subgradient
 
 
 def settlement_cost(price: np.ndarray, g0: np.ndarray, g_final: np.ndarray) -> np.ndarray:
-    """phi_t = p g^F + 0.5 p |g^F - g^0|. Vectorised and used in tests and audits."""
+    """Main phi_t = p g^F + 0.5 p |g^F - g^0|. Vectorised and used in tests and audits."""
     price = np.asarray(price, dtype=float).ravel()
     g0 = np.asarray(g0, dtype=float).ravel()
     g_final = np.asarray(g_final, dtype=float).ravel()
     return price * g_final + ADJUST_ABS_COEFF * price * np.abs(g_final - g0)
+
+
+def adjacent_adjustment_cost(price: np.ndarray, g_prev: np.ndarray, g_new: np.ndarray) -> np.ndarray:
+    """1.5 p (up)_+ + 0.5 p (down)_+ between two adjacent commitment versions."""
+    price = np.asarray(price, dtype=float).ravel()
+    g_prev = np.asarray(g_prev, dtype=float).ravel()
+    g_new = np.asarray(g_new, dtype=float).ravel()
+    up = np.maximum(g_new - g_prev, 0.0)
+    down = np.maximum(g_prev - g_new, 0.0)
+    return 1.5 * price * up + 0.5 * price * down
+
+
+def realized_settlement(
+    price: np.ndarray,
+    versions: list[np.ndarray] | tuple[np.ndarray, ...],
+    settlement_mode: str,
+) -> np.ndarray:
+    """Period-wise ordinary+adjustment bill for a full version path (no emergency)."""
+    price = np.asarray(price, dtype=float).ravel()
+    path = [np.asarray(v, dtype=float).ravel() for v in versions]
+    if not path:
+        raise ValueError("need at least the 0:00 plan")
+    if settlement_mode == SETTLEMENT_MAIN:
+        return settlement_cost(price, path[0], path[-1])
+    if settlement_mode == SETTLEMENT_ALT:
+        phi = price * path[0]
+        for prev, cur in zip(path[:-1], path[1:]):
+            phi = phi + adjacent_adjustment_cost(price, prev, cur)
+        return phi
+    raise ValueError(f"unknown settlement_mode: {settlement_mode}")
+
+
+def decompose_settlement(
+    price: np.ndarray,
+    versions: list[np.ndarray] | tuple[np.ndarray, ...],
+    settlement_mode: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return ordinary, up-fee, down-fee arrays that sum to realized_settlement."""
+    price = np.asarray(price, dtype=float).ravel()
+    path = [np.asarray(v, dtype=float).ravel() for v in versions]
+    if settlement_mode == SETTLEMENT_MAIN:
+        g0, gf = path[0], path[-1]
+        up = np.maximum(gf - g0, 0.0)
+        down = np.maximum(g0 - gf, 0.0)
+        return price * gf, 0.5 * price * up, 0.5 * price * down
+    if settlement_mode == SETTLEMENT_ALT:
+        ordinary = price * path[0]
+        up_fee = np.zeros_like(price)
+        down_fee = np.zeros_like(price)
+        for prev, cur in zip(path[:-1], path[1:]):
+            up = np.maximum(cur - prev, 0.0)
+            down = np.maximum(prev - cur, 0.0)
+            up_fee = up_fee + 1.5 * price * up
+            down_fee = down_fee + 0.5 * price * down
+        return ordinary, up_fee, down_fee
+    raise ValueError(f"unknown settlement_mode: {settlement_mode}")
 
 
 def evaluate_value_cuts(soc: float, cuts: tuple[ValueCut, ...] | None) -> float:
@@ -108,12 +166,17 @@ def solve_horizon(
     terminal_value_cuts: tuple[ValueCut, ...] | None = None,
     throughput_tiebreak: bool = True,
     bill_as_day_ahead: bool = False,
+    settlement_mode: str = SETTLEMENT_MAIN,
+    g_pre: np.ndarray | None = None,
+    sunk_settlement: float = 0.0,
 ) -> HorizonResult:
     """Solve a remaining-horizon LP.
 
     If bill_as_day_ahead is True, ordinary energy is billed as p@g with no
-    adjustment (used for the virtual next day). Otherwise settlement is
-    phi(g0, g) = p g + 0.5 p |g-g0| relative to the 0:00 plan.
+    adjustment (used for 0:00 and the virtual next day). Otherwise:
+    - anchor_final_main: phi(g0, g) = p g + 0.5 p |g-g0|
+    - adjacent_literal_sensitivity: sunk p g0 + prior adjacent fees, plus
+      1.5 p (g-g_pre)_+ + 0.5 p (g_pre-g)_+ for this update only.
     """
     n = len(load)
     price = np.asarray(price, dtype=float).ravel()
@@ -138,7 +201,7 @@ def solve_horizon(
 
     if bill_as_day_ahead:
         settlement = price @ g
-    else:
+    elif settlement_mode == SETTLEMENT_MAIN:
         if g0 is None:
             raise ValueError("g0 is required unless bill_as_day_ahead=True")
         g0 = np.asarray(g0, dtype=float).ravel()
@@ -148,6 +211,19 @@ def solve_horizon(
         down = cp.Variable(n, nonneg=True)
         constraints.append(g - g0 == up - down)
         settlement = price @ g + ADJUST_ABS_COEFF * price @ (up + down)
+    elif settlement_mode == SETTLEMENT_ALT:
+        if g0 is None or g_pre is None:
+            raise ValueError("adjacent settlement requires g0 and g_pre")
+        g0 = np.asarray(g0, dtype=float).ravel()
+        g_pre_arr = np.asarray(g_pre, dtype=float).ravel()
+        if g0.shape != (n,) or g_pre_arr.shape != (n,):
+            raise ValueError("g0 and g_pre must match the remaining horizon")
+        up = cp.Variable(n, nonneg=True)
+        down = cp.Variable(n, nonneg=True)
+        constraints.append(g - g_pre_arr == up - down)
+        settlement = float(sunk_settlement) + 1.5 * price @ up + 0.5 * price @ down
+    else:
+        raise ValueError(f"unknown settlement_mode: {settlement_mode}")
 
     primary = settlement + emergency_cost + terminal_term
     problem = cp.Problem(cp.Minimize(primary), constraints)
@@ -177,8 +253,10 @@ def solve_horizon(
     Ev = np.asarray(E.value).ravel()
     if bill_as_day_ahead:
         settle = float(price @ gv)
-    else:
+    elif settlement_mode == SETTLEMENT_MAIN:
         settle = float(np.sum(settlement_cost(price, g0, gv)))
+    else:
+        settle = float(sunk_settlement) + float(np.sum(adjacent_adjustment_cost(price, g_pre_arr, gv)))
     terminal = evaluate_value_cuts(float(Ev[-1]), terminal_value_cuts)
     dual = float(np.asarray(constraints[0].dual_value))
     return HorizonResult(
