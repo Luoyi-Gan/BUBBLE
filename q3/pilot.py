@@ -19,6 +19,9 @@ from q3.config import (
     ETA_D,
     FIG_DIR,
     HOUR_TO_FIRST_MUTABLE,
+    LOAD_INFORMATION_CASES,
+    LOAD_INFORMATION_MAIN,
+    LOAD_INFORMATION_PROXY,
     NEXT_DAY_VALUE_GAP_TOL_YUAN,
     NEXT_DAY_VALUE_MAX_SAMPLES,
     NUMERIC_TOL,
@@ -29,12 +32,17 @@ from q3.config import (
     STRATEGIES,
     T,
     VOI_EPS_YUAN,
+    WARMUP_CSV_MAIN,
 )
 from q3.data import Q3Data
 from q3.forecast import (
     causal_load_forecast,
+    causal_load_sources,
+    execution_load_horizon,
+    load_forecast_audit_rows,
     map_issue_forecast,
     next_day_pv_forecast,
+    planning_load_curve,
     write_forecast_mapping,
 )
 from q3.optimization import (
@@ -59,15 +67,26 @@ ORANGE = "#e09f3e"
 PURPLE = "#6d597a"
 
 
+ValueCutCache = dict[tuple[int, int], tuple[tuple[ValueCut, ...], list[dict]]]
+
+
 @dataclass
 class DayRun:
     date: str
     strategy: str
+    load_information_case: str
     with_terminal_value: bool
     dispatch: pd.DataFrame
     update_log: pd.DataFrame
     summary: dict
     next_day_value_rows: list[dict] = field(default_factory=list)
+
+
+def dispatch_output_stem(date: str, strategy: str, load_information_case: str, with_terminal_value: bool) -> str:
+    suffix = strategy + "_" + load_information_case
+    if not with_terminal_value:
+        suffix += "_no48h"
+    return f"q3_dispatch_{date}_{suffix}"
 
 
 def build_next_day_value_cuts(
@@ -162,17 +181,35 @@ def _index_to_update_hour(index: int) -> int | None:
     return inverse.get(index)
 
 
+def _next_day_value_cuts(
+    data: Q3Data,
+    day_index: int,
+    issue_hour: int,
+    cache: ValueCutCache | None,
+) -> tuple[tuple[ValueCut, ...], list[dict]]:
+    key = (day_index, issue_hour)
+    if cache is not None and key in cache:
+        return cache[key]
+    cuts, rows = build_next_day_value_cuts(data, day_index, issue_hour)
+    if cache is not None:
+        cache[key] = (cuts, rows)
+    return cuts, rows
+
+
 def run_day(
     data: Q3Data,
     day_index: int,
     strategy: str,
     initial_soc: float,
     with_terminal_value: bool = True,
+    load_information_case: str = LOAD_INFORMATION_MAIN,
+    value_cut_cache: ValueCutCache | None = None,
 ) -> DayRun:
     date = data.dates[day_index].strftime("%Y-%m-%d")
     allowed = STRATEGY_ALLOWED_UPDATES[strategy]
     price = data.price
-    load = data.load[day_index]
+    actual_load = data.load[day_index]
+    plan_load = planning_load_curve(data, day_index, load_information_case)
     actual_pv = data.pv[day_index]
     started = perf_counter()
 
@@ -181,18 +218,18 @@ def run_day(
     cuts: tuple[ValueCut, ...] = ()
     value_rows: list[dict] = []
     if with_terminal_value:
-        cuts, rows = build_next_day_value_cuts(data, day_index, 0)
+        cuts, rows = _next_day_value_cuts(data, day_index, 0, value_cut_cache)
         value_rows.extend(rows)
 
     midnight = solve_horizon(
         price,
-        load,
+        plan_load,
         current_forecast,
         initial_soc,
         bill_as_day_ahead=True,
         terminal_value_cuts=cuts or None,
     )
-    assert_physical(midnight, load, current_forecast, prefix=f"{date} 0:00 plan ")
+    assert_physical(midnight, plan_load, current_forecast, prefix=f"{date} 0:00 plan ")
     g0 = midnight.g.copy()
     g = g0.copy()
     last_update = "00:00"
@@ -230,10 +267,10 @@ def run_day(
             mapped = map_issue_forecast(data, day_index, hour)
             current_forecast = mapped.today_kwh.copy()
             if with_terminal_value:
-                cuts, rows = build_next_day_value_cuts(data, day_index, hour)
+                cuts, rows = _next_day_value_cuts(data, day_index, hour, value_cut_cache)
                 value_rows.extend(rows)
             pv_plan = current_forecast[t:]
-            load_plan = load[t:]
+            load_plan = plan_load[t:]
             g0_rem = g0[t:]
             g_pre = g[t:].copy()
             j_fix = solve_horizon(
@@ -282,9 +319,10 @@ def run_day(
 
         pv_horizon = current_forecast[t:].copy()
         pv_horizon[0] = actual_pv[t]
+        load_horizon = execution_load_horizon(plan_load, actual_load, t)
         step = solve_horizon(
             price[t:],
-            load[t:],
+            load_horizon,
             pv_horizon,
             soc,
             g0=g0[t:],
@@ -297,7 +335,7 @@ def run_day(
             + actual_pv[t]
             - step.curtailment[0]
             + step.discharge[0]
-            - load[t]
+            - actual_load[t]
             - step.charge[0]
         )
         soc_next = float(step.soc[1])
@@ -314,7 +352,8 @@ def run_day(
                 "planned_g0_kwh": float(g0[t]),
                 "final_g_kwh": float(g[t]),
                 "normal_x_kwh": float(step.x[0]),
-                "load_kwh": float(load[t]),
+                "load_kwh": float(actual_load[t]),
+                "forecast_load_kwh": float(plan_load[t]),
                 "actual_pv_kwh": float(actual_pv[t]),
                 "forecast_pv_kwh": float(current_forecast[t]),
                 "charge_kwh": float(step.charge[0]),
@@ -347,11 +386,13 @@ def run_day(
     )
     update_log = pd.DataFrame(update_rows)
     update_log.insert(1, "strategy", strategy)
-    update_log.insert(2, "with_terminal_value", with_terminal_value)
+    update_log.insert(2, "load_information_case", load_information_case)
+    update_log.insert(3, "with_terminal_value", with_terminal_value)
     n_adjust = int(((update_log["update_time"] != "00:00") & update_log["implemented"]).sum())
     summary = {
         "date": date,
         "strategy": strategy,
+        "load_information_case": load_information_case,
         "with_terminal_value": with_terminal_value,
         "total_cost_yuan": float(dispatch["phi_yuan"].sum() + dispatch["emergency_cost_yuan"].sum()),
         "settlement_cost_yuan": float(dispatch["phi_yuan"].sum()),
@@ -379,7 +420,16 @@ def run_day(
         "locked_period_violations": int(locked_violations),
         "runtime_seconds": float(perf_counter() - started),
     }
-    return DayRun(date, strategy, with_terminal_value, dispatch, update_log, summary, value_rows)
+    return DayRun(
+        date,
+        strategy,
+        load_information_case,
+        with_terminal_value,
+        dispatch,
+        update_log,
+        summary,
+        value_rows,
+    )
 
 
 def warmup_soc_to(
@@ -391,7 +441,14 @@ def warmup_soc_to(
     soc = E_INITIAL_KWH
     for i in range(target_index):
         starts[i] = soc
-        result = run_day(data, i, "M0", soc, with_terminal_value=True)
+        result = run_day(
+            data,
+            i,
+            "M0",
+            soc,
+            with_terminal_value=True,
+            load_information_case=LOAD_INFORMATION_MAIN,
+        )
         soc = float(result.summary["soc_end_kwh"])
         rows.append(
             {
@@ -400,6 +457,7 @@ def warmup_soc_to(
                 "soc_end_kwh": result.summary["soc_end_kwh"],
                 "total_cost_yuan": result.summary["total_cost_yuan"],
                 "strategy": "M0_warmup",
+                "load_information_case": LOAD_INFORMATION_MAIN,
             }
         )
     starts[target_index] = soc
@@ -450,11 +508,13 @@ def write_cost_audit(runs: list[DayRun], path: Path) -> pd.DataFrame:
         block = run.dispatch.copy()
         block["date"] = run.date
         block["strategy"] = run.strategy
+        block["load_information_case"] = run.load_information_case
         frames.append(
             block[
                 [
                     "date",
                     "strategy",
+                    "load_information_case",
                     "time",
                     "planned_g0_kwh",
                     "final_g_kwh",
@@ -466,7 +526,14 @@ def write_cost_audit(runs: list[DayRun], path: Path) -> pd.DataFrame:
             ]
         )
         for item in _spotcheck_settlement(run.dispatch):
-            spot.append({"date": run.date, "strategy": run.strategy, **item})
+            spot.append(
+                {
+                    "date": run.date,
+                    "strategy": run.strategy,
+                    "load_information_case": run.load_information_case,
+                    **item,
+                }
+            )
     frame = pd.concat(frames, ignore_index=True)
     path.parent.mkdir(parents=True, exist_ok=True)
     frame.to_csv(path, index=False)
@@ -479,7 +546,9 @@ def write_cost_audit(runs: list[DayRun], path: Path) -> pd.DataFrame:
 def plot_pilot_figures(runs: list[DayRun], comparison: pd.DataFrame) -> None:
     FIG_DIR.mkdir(parents=True, exist_ok=True)
     main = comparison[
-        comparison["strategy"].isin(STRATEGIES) & comparison["with_terminal_value"]
+        comparison["strategy"].isin(STRATEGIES)
+        & comparison["with_terminal_value"]
+        & comparison["load_information_case"].eq(LOAD_INFORMATION_MAIN)
     ].copy()
     fig, ax = plt.subplots(figsize=(8.2, 4.4))
     dates = list(dict.fromkeys(main["date"]))
@@ -497,24 +566,30 @@ def plot_pilot_figures(runs: list[DayRun], comparison: pd.DataFrame) -> None:
     ax.set_xticks(x)
     ax.set_xticklabels(STRATEGIES)
     ax.set_ylabel("total purchase cost (yuan)")
-    ax.set_title("Q3 pilot: update-policy cost")
+    ax.set_title("Q3 pilot: update-policy cost (causal_load_main)")
     ax.legend(frameon=False)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     fig.tight_layout()
     fig.savefig(FIG_DIR / "fig3_strategy_cost.png")
+    fig.savefig(FIG_DIR / "fig3_strategy_cost_causal_load_main.png")
     plt.close(fig)
 
     for run in runs:
-        if run.strategy != "M1_M6" or not run.with_terminal_value:
+        if (
+            run.strategy != "M1_M6"
+            or not run.with_terminal_value
+            or run.load_information_case != LOAD_INFORMATION_MAIN
+        ):
             continue
         d = run.dispatch
         fig, axes = plt.subplots(3, 1, figsize=(8.6, 7.2), sharex=True)
         t = np.arange(len(d))
-        axes[0].plot(t, d["load_kwh"], color=NAVY, lw=1.2, label="load")
+        axes[0].plot(t, d["load_kwh"], color=NAVY, lw=1.2, label="actual load")
+        axes[0].plot(t, d["forecast_load_kwh"], color=PURPLE, lw=1.0, ls="--", label="causal load hat")
         axes[0].plot(t, d["actual_pv_kwh"], color=TEAL, lw=1.2, label="actual PV")
         axes[0].plot(t, d["forecast_pv_kwh"], color=ORANGE, lw=1.0, ls="--", label="active PV forecast")
-        axes[0].legend(frameon=False, ncol=3)
+        axes[0].legend(frameon=False, ncol=2)
         axes[0].set_ylabel("kWh / 10 min")
         axes[1].plot(t, d["planned_g0_kwh"], color=PURPLE, lw=1.1, label="g0")
         axes[1].plot(t, d["final_g_kwh"], color=ORANGE, lw=1.2, label="gF")
@@ -526,9 +601,10 @@ def plot_pilot_figures(runs: list[DayRun], comparison: pd.DataFrame) -> None:
         axes[2].axhline(E_MAX_KWH, color=ORANGE, ls="--", lw=0.8)
         axes[2].set_ylabel("SOC kWh")
         axes[2].set_xlabel("10-minute index")
-        fig.suptitle(f"{run.date} M1/M6 dispatch", fontsize=12)
+        fig.suptitle(f"{run.date} M1/M6 dispatch ({LOAD_INFORMATION_MAIN})", fontsize=12)
         fig.tight_layout()
         fig.savefig(FIG_DIR / f"fig3_dispatch_{run.date}_M1_M6.png")
+        fig.savefig(FIG_DIR / f"fig3_dispatch_{run.date}_M1_M6_{LOAD_INFORMATION_MAIN}.png")
         plt.close(fig)
 
         log = run.update_log[run.update_log["update_time"] != "00:00"]
@@ -536,13 +612,46 @@ def plot_pilot_figures(runs: list[DayRun], comparison: pd.DataFrame) -> None:
         ax.bar(log["update_time"], log["voi_yuan"], color=TEAL)
         ax.axhline(VOI_EPS_YUAN, color=ORANGE, ls="--", lw=0.9, label="VoI threshold")
         ax.set_ylabel("VoI (yuan)")
-        ax.set_title(f"{run.date} information value by update")
+        ax.set_title(f"{run.date} information value by update ({LOAD_INFORMATION_MAIN})")
         ax.legend(frameon=False)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         fig.tight_layout()
         fig.savefig(FIG_DIR / f"fig3_voi_{run.date}.png")
+        fig.savefig(FIG_DIR / f"fig3_voi_{run.date}_{LOAD_INFORMATION_MAIN}.png")
         plt.close(fig)
+
+    info = comparison[
+        comparison["strategy"].isin(STRATEGIES) & comparison["with_terminal_value"]
+    ].copy()
+    fig, axes = plt.subplots(1, 2, figsize=(9.4, 4.2), sharey=True)
+    x = np.arange(len(STRATEGIES))
+    width = 0.35
+    for ax, date in zip(axes, list(dict.fromkeys(info["date"]))):
+        for i, case in enumerate(LOAD_INFORMATION_CASES):
+            subset = (
+                info[(info["date"] == date) & (info["load_information_case"] == case)]
+                .set_index("strategy")
+                .loc[list(STRATEGIES)]
+            )
+            ax.bar(
+                x + (i - 0.5) * width,
+                subset["total_cost_yuan"],
+                width=width,
+                color=(NAVY if i == 0 else ORANGE),
+                label=case,
+            )
+        ax.set_xticks(x)
+        ax.set_xticklabels(STRATEGIES, rotation=20, ha="right")
+        ax.set_title(date)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+    axes[0].set_ylabel("total purchase cost (yuan)")
+    axes[0].legend(frameon=False, fontsize=8)
+    fig.suptitle("Load-information comparison (same SOC, prices, PV, settlement)", fontsize=12)
+    fig.tight_layout()
+    fig.savefig(FIG_DIR / "fig3_load_information_comparison.png")
+    plt.close(fig)
 
 
 def physical_audit(runs: list[DayRun], warmup_end_soc: float | None) -> dict:
@@ -554,6 +663,7 @@ def physical_audit(runs: list[DayRun], warmup_end_soc: float | None) -> dict:
         rec = {
             "date": run.date,
             "strategy": run.strategy,
+            "load_information_case": run.load_information_case,
             "with_terminal_value": run.with_terminal_value,
             "max_balance_residual_kwh": run.summary["max_balance_residual_kwh"],
             "max_soc_residual_kwh": run.summary["max_soc_residual_kwh"],
@@ -575,8 +685,127 @@ def physical_audit(runs: list[DayRun], warmup_end_soc: float | None) -> dict:
     return {
         "all_pass": all_pass,
         "warmup_end_soc_for_2025-02-01": warmup_end_soc,
+        "warmup_load_information_case": LOAD_INFORMATION_MAIN,
         "runs": items,
     }
+
+
+def write_load_forecast_audit(data: Q3Data, path: Path) -> pd.DataFrame:
+    rows: list[dict] = []
+    for date in PILOT_DATES:
+        rows.extend(load_forecast_audit_rows(data, data.date_index(date)))
+    frame = pd.DataFrame(rows)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(path, index=False)
+    return frame
+
+
+def write_load_information_comparison(comparison: pd.DataFrame, path: Path) -> pd.DataFrame:
+    cols = [
+        "date",
+        "strategy",
+        "load_information_case",
+        "with_terminal_value",
+        "total_cost_yuan",
+        "settlement_cost_yuan",
+        "emergency_cost_yuan",
+        "emergency_kwh",
+        "curtailment_kwh",
+        "soc_start_kwh",
+        "soc_end_kwh",
+        "runtime_seconds",
+    ]
+    frame = comparison[cols].copy()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    frame.to_csv(path, index=False)
+    return frame
+
+
+def run_causality_audit(data: Q3Data, day_index: int, initial_soc: float) -> dict:
+    """Perturb unrealized same-day actual load: main forecasts stay put, proxy may move."""
+    date = data.dates[day_index].strftime("%Y-%m-%d")
+    price = data.price
+    pv0 = map_issue_forecast(data, day_index, 0).today_kwh
+    hat_before, sources_before, label_before = causal_load_sources(data, day_index, day_index)
+    proxy_before = planning_load_curve(data, day_index, LOAD_INFORMATION_PROXY)
+    next_before = (
+        causal_load_forecast(data, day_index + 1, day_index)
+        if day_index + 1 < len(data.dates)
+        else None
+    )
+    g0_main_before = solve_horizon(
+        price, hat_before, pv0, initial_soc, bill_as_day_ahead=True, throughput_tiebreak=False
+    ).g
+    g0_proxy_before = solve_horizon(
+        price, proxy_before, pv0, initial_soc, bill_as_day_ahead=True, throughput_tiebreak=False
+    ).g
+
+    original = data.load[day_index].copy()
+    perturbation_kwh = 500.0
+    try:
+        data.load[day_index, 36:] += perturbation_kwh
+        hat_after, sources_after, label_after = causal_load_sources(data, day_index, day_index)
+        proxy_after = planning_load_curve(data, day_index, LOAD_INFORMATION_PROXY)
+        next_after = (
+            causal_load_forecast(data, day_index + 1, day_index)
+            if day_index + 1 < len(data.dates)
+            else None
+        )
+        g0_main_after = solve_horizon(
+            price, hat_after, pv0, initial_soc, bill_as_day_ahead=True, throughput_tiebreak=False
+        ).g
+        g0_proxy_after = solve_horizon(
+            price, proxy_after, pv0, initial_soc, bill_as_day_ahead=True, throughput_tiebreak=False
+        ).g
+        mapped6_before = map_issue_forecast(data, day_index, 6)
+        plan_main_update_before = hat_before[36:]
+        plan_main_update_after = hat_after[36:]
+    finally:
+        data.load[day_index] = original
+
+    main_forecast_delta = float(np.max(np.abs(hat_after - hat_before)))
+    main_update_delta = float(np.max(np.abs(plan_main_update_after - plan_main_update_before)))
+    main_g0_delta = float(np.max(np.abs(g0_main_after - g0_main_before)))
+    proxy_plan_delta = float(np.max(np.abs(proxy_after - proxy_before)))
+    proxy_g0_delta = float(np.max(np.abs(g0_proxy_after - g0_proxy_before)))
+    next_delta = (
+        float(np.max(np.abs(next_after - next_before))) if next_before is not None else 0.0
+    )
+    payload = {
+        "date": date,
+        "perturbed_slice": "periods[36:] (unrealized same-day actual load after 06:00)",
+        "perturbation_kwh": perturbation_kwh,
+        "source_dates": label_before,
+        "source_dates_after_perturbation": label_after,
+        "main_day_ahead_forecast_unchanged": bool(main_forecast_delta < 1e-12),
+        "main_update_forecast_unchanged": bool(main_update_delta < 1e-12),
+        "main_next_day_forecast_unchanged": bool(next_delta < 1e-12),
+        "main_g0_unchanged": bool(main_g0_delta < 1e-6),
+        "proxy_planning_load_changed": bool(proxy_plan_delta > 1.0),
+        "proxy_g0_changed": bool(proxy_g0_delta > 1e-6),
+        "max_abs_main_forecast_delta_kwh": main_forecast_delta,
+        "max_abs_main_update_forecast_delta_kwh": main_update_delta,
+        "max_abs_main_g0_delta_kwh": main_g0_delta,
+        "max_abs_proxy_planning_delta_kwh": proxy_plan_delta,
+        "max_abs_proxy_g0_delta_kwh": proxy_g0_delta,
+        "max_abs_next_day_forecast_delta_kwh": next_delta,
+        "source_indices_unchanged": sources_before == sources_after,
+        "six_am_first_mutable_index": int(mapped6_before.first_mutable_index),
+        "note": (
+            "causal_load_main day-ahead and 6/12/18 future load stay at the 0:00 hat. "
+            "actual_load_proxy is allowed to change because it reads the full same-day Attachment 2 path."
+        ),
+    }
+    payload["all_pass"] = bool(
+        payload["main_day_ahead_forecast_unchanged"]
+        and payload["main_update_forecast_unchanged"]
+        and payload["main_next_day_forecast_unchanged"]
+        and payload["main_g0_unchanged"]
+        and payload["proxy_planning_load_changed"]
+        and payload["proxy_g0_changed"]
+        and payload["source_indices_unchanged"]
+    )
+    return payload
 
 
 def run_q3_pilot(data: Q3Data) -> dict:
@@ -586,14 +815,15 @@ def run_q3_pilot(data: Q3Data) -> dict:
 
     write_input_audit(data, OUTPUT_DIR / "input_audit.json")
     write_forecast_mapping(data, OUTPUT_DIR / "q3_forecast_mapping.csv")
+    write_load_forecast_audit(data, OUTPUT_DIR / "q3_load_forecast_audit.csv")
 
     feb_index = data.date_index("2025-02-01")
-    warmup_path = OUTPUT_DIR / "q3_warmup_daily.csv"
+    warmup_path = OUTPUT_DIR / WARMUP_CSV_MAIN
     if warmup_path.exists() and len(pd.read_csv(warmup_path)) >= feb_index:
         warmup_frame = pd.read_csv(warmup_path)
         warmup_starts = np.full(feb_index + 1, E_INITIAL_KWH)
         warmup_starts[1:] = warmup_frame["soc_end_kwh"].to_numpy()[:feb_index]
-        print(f"reusing warmup SOC from {warmup_path}")
+        print(f"reusing causal_load_main warmup SOC from {warmup_path}")
     else:
         warmup_starts, _warmup = warmup_soc_to(data, feb_index, warmup_path)
     initial = {
@@ -601,55 +831,91 @@ def run_q3_pilot(data: Q3Data) -> dict:
         "2025-06-21": E_INITIAL_KWH,
     }
 
+    value_cut_cache: ValueCutCache = {}
     runs: list[DayRun] = []
     for date in PILOT_DATES:
         i = data.date_index(date)
         soc0 = initial[date]
-        for strategy in STRATEGIES:
-            runs.append(run_day(data, i, strategy, soc0, with_terminal_value=True))
-        runs.append(
-            run_day(data, i, "M1_M6", soc0, with_terminal_value=False)
-        )
+        for case in LOAD_INFORMATION_CASES:
+            for strategy in STRATEGIES:
+                runs.append(
+                    run_day(
+                        data,
+                        i,
+                        strategy,
+                        soc0,
+                        with_terminal_value=True,
+                        load_information_case=case,
+                        value_cut_cache=value_cut_cache,
+                    )
+                )
+            runs.append(
+                run_day(
+                    data,
+                    i,
+                    "M1_M6",
+                    soc0,
+                    with_terminal_value=False,
+                    load_information_case=case,
+                    value_cut_cache=value_cut_cache,
+                )
+            )
 
     comparison = pd.DataFrame([run.summary for run in runs])
     comparison.to_csv(OUTPUT_DIR / "q3_strategy_comparison.csv", index=False)
+    write_load_information_comparison(
+        comparison, OUTPUT_DIR / "q3_load_information_comparison.csv"
+    )
     update_log = pd.concat([run.update_log for run in runs], ignore_index=True)
     update_log.to_csv(OUTPUT_DIR / "q3_update_log.csv", index=False)
-    value_rows = [row for run in runs for row in run.next_day_value_rows]
+    value_rows = []
+    for _key in sorted(value_cut_cache):
+        value_rows.extend(value_cut_cache[_key][1])
     if value_rows:
         pd.DataFrame(value_rows).to_csv(OUTPUT_DIR / "q3_next_day_value_audit.csv", index=False)
     write_cost_audit(runs, OUTPUT_DIR / "q3_cost_audit.csv")
 
+    dispatch_cols = [
+        "time",
+        "planned_g0_kwh",
+        "final_g_kwh",
+        "normal_x_kwh",
+        "load_kwh",
+        "forecast_load_kwh",
+        "actual_pv_kwh",
+        "forecast_pv_kwh",
+        "charge_kwh",
+        "discharge_kwh",
+        "curtailment_kwh",
+        "emergency_kwh",
+        "soc_kwh",
+        "balance_residual_kwh",
+        "last_update_time",
+    ]
     for run in runs:
-        suffix = run.strategy + ("" if run.with_terminal_value else "_no48h")
-        cols = [
-            "time",
-            "planned_g0_kwh",
-            "final_g_kwh",
-            "normal_x_kwh",
-            "load_kwh",
-            "actual_pv_kwh",
-            "forecast_pv_kwh",
-            "charge_kwh",
-            "discharge_kwh",
-            "curtailment_kwh",
-            "emergency_kwh",
-            "soc_kwh",
-            "balance_residual_kwh",
-            "last_update_time",
-        ]
-        run.dispatch[cols].to_csv(
-            OUTPUT_DIR / f"q3_dispatch_{run.date}_{suffix}.csv", index=False
+        stem = dispatch_output_stem(
+            run.date, run.strategy, run.load_information_case, run.with_terminal_value
         )
+        run.dispatch[dispatch_cols].to_csv(OUTPUT_DIR / f"{stem}.csv", index=False)
 
     plot_pilot_figures(runs, comparison)
     audit = physical_audit(runs, initial["2025-02-01"])
     (OUTPUT_DIR / "q3_physical_audit.json").write_text(
         json.dumps(audit, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
+    causality = run_causality_audit(
+        data, data.date_index("2025-02-01"), initial["2025-02-01"]
+    )
+    (OUTPUT_DIR / "q3_causality_audit.json").write_text(
+        json.dumps(causality, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+    if not causality["all_pass"]:
+        raise AssertionError(f"Q3 load causality audit failed: {causality}")
     return {
         "initial_soc": initial,
         "comparison": comparison,
         "audit": audit,
+        "causality": causality,
         "n_runs": len(runs),
+        "load_treatment": LOAD_INFORMATION_MAIN,
     }

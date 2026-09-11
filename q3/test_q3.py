@@ -12,13 +12,19 @@ from q3.config import (
     DELTA_H,
     E_INITIAL_KWH,
     HOUR_TO_FIRST_MUTABLE,
+    LOAD_INFORMATION_MAIN,
+    LOAD_INFORMATION_PROXY,
     T,
 )
 from q3.data import load_q3_data, period_end_minutes
 from q3.forecast import (
+    causal_load_forecast,
+    causal_load_sources,
+    execution_load_horizon,
     forecast_knots_minutes_kw,
     interpolate_series,
     map_issue_forecast,
+    planning_load_curve,
 )
 from q3.optimization import settlement_cost, solve_horizon
 
@@ -113,6 +119,91 @@ class AttachmentTests(unittest.TestCase):
         # 07:00 node is 预报1小时 and lands on index 41.
         expected = self.data.hourly_forecast_kw[6][i, 0] * DELTA_H
         self.assertAlmostEqual(mapped.today_kwh[41], expected, places=6)
+
+
+class CausalLoadTests(unittest.TestCase):
+    def test_execution_horizon_uses_actual_only_at_current_step(self) -> None:
+        plan = np.arange(5, dtype=float)
+        actual = np.full(5, 99.0)
+        horizon = execution_load_horizon(plan, actual, 2)
+        np.testing.assert_allclose(horizon, np.array([99.0, 3.0, 4.0]))
+
+
+@unittest.skipUnless(ATTACH1.exists() and ATTACH3.exists(), "C-problem attachments unavailable")
+class CausalLoadAttachmentTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.data = load_q3_data()
+
+    def test_load_sources_are_strictly_before_target(self) -> None:
+        i = self.data.date_index("2025-02-01")
+        hat, sources, label = causal_load_sources(self.data, i, i)
+        self.assertTrue(len(sources) > 0)
+        self.assertTrue(all(j < i for j in sources))
+        self.assertNotIn(self.data.dates[i].strftime("%Y-%m-%d"), label)
+        np.testing.assert_allclose(hat, causal_load_forecast(self.data, i, i))
+        np.testing.assert_allclose(
+            planning_load_curve(self.data, i, LOAD_INFORMATION_MAIN), hat
+        )
+        np.testing.assert_allclose(
+            planning_load_curve(self.data, i, LOAD_INFORMATION_PROXY),
+            self.data.load[i],
+        )
+
+    def test_future_same_day_load_does_not_change_main_forecast(self) -> None:
+        i = self.data.date_index("2025-06-21")
+        before_main = causal_load_forecast(self.data, i, i)
+        before_proxy = planning_load_curve(self.data, i, LOAD_INFORMATION_PROXY)
+        original = self.data.load[i].copy()
+        try:
+            self.data.load[i, 36:] += 777.0
+            after_main = causal_load_forecast(self.data, i, i)
+            after_proxy = planning_load_curve(self.data, i, LOAD_INFORMATION_PROXY)
+            after_next = causal_load_forecast(self.data, i + 1, i)
+        finally:
+            self.data.load[i] = original
+        before_next = causal_load_forecast(self.data, i + 1, i)
+        np.testing.assert_allclose(before_main, after_main)
+        np.testing.assert_allclose(before_next, after_next)
+        self.assertGreater(float(np.max(np.abs(after_proxy - before_proxy))), 1.0)
+
+    def test_main_g0_ignores_future_actual_load_proxy_does_not(self) -> None:
+        from q3.forecast import map_issue_forecast
+        from q3.optimization import solve_horizon
+
+        i = self.data.date_index("2025-02-01")
+        pv = map_issue_forecast(self.data, i, 0).today_kwh
+        main = planning_load_curve(self.data, i, LOAD_INFORMATION_MAIN)
+        proxy = planning_load_curve(self.data, i, LOAD_INFORMATION_PROXY)
+        g0_main_before = solve_horizon(
+            self.data.price, main, pv, E_INITIAL_KWH, bill_as_day_ahead=True, throughput_tiebreak=False
+        ).g
+        g0_proxy_before = solve_horizon(
+            self.data.price, proxy, pv, E_INITIAL_KWH, bill_as_day_ahead=True, throughput_tiebreak=False
+        ).g
+        original = self.data.load[i].copy()
+        try:
+            self.data.load[i, 36:] += 500.0
+            g0_main_after = solve_horizon(
+                self.data.price,
+                planning_load_curve(self.data, i, LOAD_INFORMATION_MAIN),
+                pv,
+                E_INITIAL_KWH,
+                bill_as_day_ahead=True,
+                throughput_tiebreak=False,
+            ).g
+            g0_proxy_after = solve_horizon(
+                self.data.price,
+                planning_load_curve(self.data, i, LOAD_INFORMATION_PROXY),
+                pv,
+                E_INITIAL_KWH,
+                bill_as_day_ahead=True,
+                throughput_tiebreak=False,
+            ).g
+        finally:
+            self.data.load[i] = original
+        np.testing.assert_allclose(g0_main_before, g0_main_after, atol=1e-6)
+        self.assertGreater(float(np.max(np.abs(g0_proxy_after - g0_proxy_before))), 1e-6)
 
 
 if __name__ == "__main__":

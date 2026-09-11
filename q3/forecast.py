@@ -9,6 +9,8 @@ from q3.config import (
     DELTA_H,
     HOUR_TO_FIRST_MUTABLE,
     LOAD_HISTORY_SAME_WEEKDAY,
+    LOAD_INFORMATION_MAIN,
+    LOAD_INFORMATION_PROXY,
     NEXT_DAY_PV_HISTORY_DAYS,
     PILOT_DATES,
     T,
@@ -129,23 +131,82 @@ def map_issue_forecast(
     )
 
 
+def causal_load_sources(
+    data: Q3Data, target_index: int, history_end_exclusive: int
+) -> tuple[np.ndarray, tuple[int, ...], str]:
+    """Q2-style day-ahead load forecast: last <=4 same-weekday complete days."""
+    if history_end_exclusive > target_index:
+        raise ValueError("load forecast cutoff must not exceed the target date")
+    if history_end_exclusive <= 0:
+        return data.fallback_load.copy(), (), "attachment1_fallback"
+    target_weekday = data.dates[target_index].weekday()
+    sources = tuple(
+        j
+        for j in range(history_end_exclusive)
+        if data.dates[j].weekday() == target_weekday
+    )[-LOAD_HISTORY_SAME_WEEKDAY:]
+    if not sources:
+        return data.fallback_load.copy(), (), "attachment1_fallback"
+    label = ";".join(data.dates[j].strftime("%Y-%m-%d") for j in sources)
+    return data.load[list(sources)].mean(axis=0), sources, label
+
+
 def causal_load_forecast(
     data: Q3Data, target_index: int, history_end_exclusive: int
 ) -> np.ndarray:
     """Load forecast for target_index using only complete days before the cutoff."""
-    if history_end_exclusive <= 0:
-        return data.fallback_load.copy()
-    if history_end_exclusive > target_index:
-        raise ValueError("load forecast cutoff must not exceed the target date")
-    target_weekday = data.dates[target_index].weekday()
-    sources = [
-        j
-        for j in range(history_end_exclusive)
-        if data.dates[j].weekday() == target_weekday
-    ][-LOAD_HISTORY_SAME_WEEKDAY:]
-    if not sources:
-        return data.fallback_load.copy()
-    return data.load[sources].mean(axis=0)
+    hat, _sources, _label = causal_load_sources(data, target_index, history_end_exclusive)
+    return hat
+
+
+def planning_load_curve(
+    data: Q3Data, day_index: int, load_information_case: str
+) -> np.ndarray:
+    """Future-load vector used at 0:00 and later updates.
+
+    causal_load_main: day-ahead hat formed at 0:00; never reread today's actuals.
+    actual_load_proxy: full Attachment 2 path, idealized information only.
+    """
+    if load_information_case == LOAD_INFORMATION_MAIN:
+        return causal_load_forecast(data, day_index, day_index)
+    if load_information_case == LOAD_INFORMATION_PROXY:
+        return data.load[day_index].copy()
+    raise ValueError(f"unknown load_information_case: {load_information_case}")
+
+
+def execution_load_horizon(
+    plan_load: np.ndarray, actual_load: np.ndarray, t: int
+) -> np.ndarray:
+    """Current 10-minute step uses actual load; later steps keep the 0:00 hat."""
+    horizon = np.asarray(plan_load[t:], dtype=float).copy()
+    horizon[0] = float(np.asarray(actual_load, dtype=float)[t])
+    return horizon
+
+
+def load_forecast_audit_rows(data: Q3Data, day_index: int) -> list[dict]:
+    """Day-ahead causal load vs Attachment 2 actuals; future periods are not executed yet."""
+    date = data.dates[day_index].strftime("%Y-%m-%d")
+    hat, _sources, label = causal_load_sources(data, day_index, day_index)
+    actual = data.load[day_index]
+    rows: list[dict] = []
+    for t in range(T):
+        forecast = float(hat[t])
+        observed = float(actual[t])
+        rows.append(
+            {
+                "date": date,
+                "period": t,
+                "time": data.time_labels[t],
+                "forecast_load_kwh": forecast,
+                "actual_load_kwh": observed,
+                "source_dates": label,
+                "is_current_execution_period": False,
+                "abs_error_kwh": abs(forecast - observed),
+                "load_information_case": LOAD_INFORMATION_MAIN,
+                "snapshot": "day_ahead_planning",
+            }
+        )
+    return rows
 
 
 def causal_next_day_pv_base(data: Q3Data, day_index: int) -> np.ndarray:
