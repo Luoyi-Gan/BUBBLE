@@ -478,7 +478,9 @@ def write_cost_audit(runs: list[DayRun], path: Path) -> pd.DataFrame:
 
 def plot_pilot_figures(runs: list[DayRun], comparison: pd.DataFrame) -> None:
     FIG_DIR.mkdir(parents=True, exist_ok=True)
-    main = comparison[comparison["strategy"].isin(STRATEGIES)].copy()
+    main = comparison[
+        comparison["strategy"].isin(STRATEGIES) & comparison["with_terminal_value"]
+    ].copy()
     fig, ax = plt.subplots(figsize=(8.2, 4.4))
     dates = list(dict.fromkeys(main["date"]))
     x = np.arange(len(STRATEGIES))
@@ -586,9 +588,14 @@ def run_q3_pilot(data: Q3Data) -> dict:
     write_forecast_mapping(data, OUTPUT_DIR / "q3_forecast_mapping.csv")
 
     feb_index = data.date_index("2025-02-01")
-    warmup_starts, _warmup = warmup_soc_to(
-        data, feb_index, OUTPUT_DIR / "q3_warmup_daily.csv"
-    )
+    warmup_path = OUTPUT_DIR / "q3_warmup_daily.csv"
+    if warmup_path.exists() and len(pd.read_csv(warmup_path)) >= feb_index:
+        warmup_frame = pd.read_csv(warmup_path)
+        warmup_starts = np.full(feb_index + 1, E_INITIAL_KWH)
+        warmup_starts[1:] = warmup_frame["soc_end_kwh"].to_numpy()[:feb_index]
+        print(f"reusing warmup SOC from {warmup_path}")
+    else:
+        warmup_starts, _warmup = warmup_soc_to(data, feb_index, warmup_path)
     initial = {
         "2025-02-01": float(warmup_starts[feb_index]),
         "2025-06-21": E_INITIAL_KWH,

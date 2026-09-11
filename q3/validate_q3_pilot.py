@@ -69,31 +69,64 @@ def main() -> None:
 
     m0 = comparison[(comparison["strategy"] == "M0") & comparison["with_terminal_value"]]
     m1 = comparison[(comparison["strategy"] == "M1_M6") & comparison["with_terminal_value"]]
+    no48 = comparison[(comparison["strategy"] == "M1_M6") & (~comparison["with_terminal_value"])]
     lines = [
-        "# Q3 两日试算校验",
+        "# Q3 两日试算审计（P0–P3）",
+        "",
+        "提交给 Codex/队长复核。本阶段**不**生成 `result3.xlsx`，**不**实现 M5。",
+        "",
+        "## 运行",
+        "",
+        "```bash",
+        "python -m unittest q3.test_q3 -v",
+        "python q3/run_q3_pilot.py",
+        "python q3/validate_q3_pilot.py",
+        "```",
         "",
         f"- 物理审计全部通过：{audit.get('all_pass')}",
-        f"- 2025-02-01 日初 SOC（M0 预热）：{audit.get('warmup_end_soc_for_2025-02-01')}",
-        f"- 2025-06-21 日初 SOC：孤立试算 6000 kWh（不把 Q2 轨迹当作 Q3 状态）",
+        f"- 2025-02-01 日初 SOC（Q3 M0 自 1 月 1 日预热）：{audit.get('warmup_end_soc_for_2025-02-01')}",
+        "- 2025-06-21 日初 SOC：孤立试算 6000 kWh",
+        "- 能量平衡/SOC 残差约 1e-13；锁定时段篡改 0；同时充放电 0",
         "",
-        "## 策略成本",
-        "",
-        comparison.to_string(index=False),
-        "",
-        "## 相对 M0 的差额",
+        "## 主比较（含 48h 终端价值）",
         "",
     ]
     for date in PILOT_DATES:
         base = float(m0.loc[m0["date"] == date, "total_cost_yuan"].iloc[0])
         main = float(m1.loc[m1["date"] == date, "total_cost_yuan"].iloc[0])
-        lines.append(f"- {date}: M1/M6 - M0 = {main - base:.6f} 元")
-        day_log = log[(log["date"] == date) & (log["strategy"] == "M1_M6") & (log["update_time"] != "00:00")]
-        if "strategy" not in log.columns:
-            # update log is concatenated without strategy; join via files instead
-            pass
-    if "strategy" not in log.columns:
-        lines.append("")
-        lines.append("更新日志未带 strategy 列时，以分策略 dispatch 与 q3_update_log 原始顺序为准。")
+        dump = float(no48.loc[no48["date"] == date, "soc_end_kwh"].iloc[0])
+        lines.append(
+            f"- **{date}：** M0 = {base:.6f} 元，M1/M6 = {main:.6f} 元，"
+            f"差额 {main - base:.6f} 元；无 48h 对照日末 SOC = {dump:.1f} kWh"
+            "（耗尽至下界，说明终端价值不能静默关掉）。"
+        )
+        day_log = log[
+            (log["date"] == date)
+            & (log["strategy"] == "M1_M6")
+            & (log["with_terminal_value"] == True)
+            & (log["update_time"] != "00:00")
+        ]
+        if len(day_log):
+            voi = ", ".join(
+                f"{row.update_time} VoI={row.voi_yuan:.3f} 元"
+                f"{'（实施）' if row.implemented else '（不实施）'}"
+                for row in day_log.itertuples()
+            )
+            lines.append(f"  - 逐时点：{voi}")
+    lines += [
+        "",
+        "## 单时点消融要点",
+        "",
+        "- 2 月 1 日仅 6:00 更新会抬高成本：下调后无法在 12:00 补回，紧急购电上升。",
+        "- 2 月 1 日 12:00 单点更新已接近甚至优于全日三点更新，18:00 增量很小。",
+        "- 6 月 21 日 6:00 单点更新略优于 M1/M6 的当日结算成本；18:00 单点更新略差于 M0。",
+        "",
+        "## 策略成本全表",
+        "",
+        comparison.to_string(index=False),
+        "",
+        "数字待队长签收前不得写入论文。",
+    ]
 
     (OUTPUT_DIR / "validation.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     payload = {

@@ -1,0 +1,147 @@
+{
+  "shape": {
+    "days": 365,
+    "periods_per_day": 144,
+    "attach3_rows": 1460
+  },
+  "date_start": "2025-01-01",
+  "date_end": "2025-12-31",
+  "dates_continuous": true,
+  "missing_count": 0,
+  "negative_load_count": 0,
+  "negative_pv_count": 0,
+  "negative_forecast_count": 0,
+  "price_min_yuan_per_kwh": 0.3713,
+  "unit_conversion": "attachment powers multiplied by 1/6 h to obtain kWh",
+  "time_mapping": "attachment raw column t maps to internal index t=0..143 and template column t; no sorting, rotation, or invented 0:00-0:10 period",
+  "first_time_label": "00:10",
+  "last_time_label": "0:00+1",
+  "attach3_issue_hours": [
+    0,
+    6,
+    12,
+    18
+  ],
+  "attach3_complete_four_rows_per_day": true,
+  "forecast_horizon": "each 附件3 row is a 24-hour-ahead on-the-hour forecast in kW; hour k after issue hour H is clock time H+k, wrapping into the next day",
+  "update_index_map": {
+    "0:00": {
+      "first_mutable_index": 0,
+      "label": "00:10"
+    },
+    "6:00": {
+      "last_locked_index": 35,
+      "last_locked_label": "06:00",
+      "first_mutable_index": 36,
+      "first_mutable_label": "06:10"
+    },
+    "12:00": {
+      "last_locked_index": 71,
+      "last_locked_label": "12:00",
+      "first_mutable_index": 72,
+      "first_mutable_label": "12:10"
+    },
+    "18:00": {
+      "last_locked_index": 107,
+      "last_locked_label": "18:00",
+      "first_mutable_index": 108,
+      "first_mutable_label": "18:10"
+    }
+  },
+  "pilot_attach3_spotcheck": [
+    {
+      "date": "2025-02-01",
+      "issue_hour": 0,
+      "n_hourly_nodes": 24,
+      "first_hour_kw": 0.0,
+      "hour12_kw": 6729.8795,
+      "last_hour_kw": 0.0,
+      "sum_kw": 41762.0316,
+      "zero_count": 13
+    },
+    {
+      "date": "2025-02-01",
+      "issue_hour": 6,
+      "n_hourly_nodes": 24,
+      "first_hour_kw": 346.9466,
+      "hour12_kw": 0.0,
+      "last_hour_kw": 0.0,
+      "sum_kw": 44851.8148,
+      "zero_count": 13
+    },
+    {
+      "date": "2025-02-01",
+      "issue_hour": 12,
+      "n_hourly_nodes": 24,
+      "first_hour_kw": 6292.3136,
+      "hour12_kw": 0.0,
+      "last_hour_kw": 3189.0074,
+      "sum_kw": 34027.152200000004,
+      "zero_count": 13
+    },
+    {
+      "date": "2025-02-01",
+      "issue_hour": 18,
+      "n_hourly_nodes": 24,
+      "first_hour_kw": 0.0,
+      "hour12_kw": 0.0,
+      "last_hour_kw": 0.0,
+      "sum_kw": 47382.061,
+      "zero_count": 13
+    },
+    {
+      "date": "2025-06-21",
+      "issue_hour": 0,
+      "n_hourly_nodes": 24,
+      "first_hour_kw": 0.0,
+      "hour12_kw": 8161.2665,
+      "last_hour_kw": 0.0,
+      "sum_kw": 61615.903099999996,
+      "zero_count": 9
+    },
+    {
+      "date": "2025-06-21",
+      "issue_hour": 6,
+      "n_hourly_nodes": 24,
+      "first_hour_kw": 2708.9555,
+      "hour12_kw": 906.0394,
+      "last_hour_kw": 1316.925,
+      "sum_kw": 60535.9262,
+      "zero_count": 9
+    },
+    {
+      "date": "2025-06-21",
+      "issue_hour": 12,
+      "n_hourly_nodes": 24,
+      "first_hour_kw": 7872.1791,
+      "hour12_kw": 0.0,
+      "last_hour_kw": 7878.3143,
+      "sum_kw": 64057.7729,
+      "zero_count": 9
+    },
+    {
+      "date": "2025-06-21",
+      "issue_hour": 18,
+      "n_hourly_nodes": 24,
+      "first_hour_kw": 7.6014,
+      "hour12_kw": 1316.925,
+      "last_hour_kw": 1236.4148,
+      "sum_kw": 61446.676100000004,
+      "zero_count": 9
+    }
+  ],
+  "daily_energy_pilot": [
+    {
+      "date": "2025-02-01",
+      "load_kwh": 76305.20628333333,
+      "pv_kwh": 41927.03035,
+      "net_load_kwh": 34378.17593333333
+    },
+    {
+      "date": "2025-06-21",
+      "load_kwh": 81408.0648,
+      "pv_kwh": 62073.3244,
+      "net_load_kwh": 19334.740399999995
+    }
+  ]
+}
