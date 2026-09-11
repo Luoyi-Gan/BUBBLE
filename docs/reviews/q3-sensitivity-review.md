@@ -28,4 +28,4 @@ Cursor 在进入全年运行前须于其分支提交：40 运行键的汇总、�
 
 ## 4. 下一阶段
 
-下一项是 RQ3-3：每个策略从 2025-01-01 的 6000 kWh 出发，在自身信息、映射和结算口径下连续传递全年 SOC。全年结果仍须将 `linear_anchor_main + anchor_final_main` 作为主口径，并把本次两种敏感性保留为明确对照。
+下一项是 RQ3-3：每个策略从 2025-01-01 的 6000 kWh 出发，在自身信息、映射和结算口径下连续传递全年 SOC。全年结果仍须将 `linear_anchor_main + anchor_final_main` 作为主口径，并把本次两种敏感性保留为明确对照。年末 SOC 的 1200/6000 kWh A/B 边界已登记为待队长选择事项，详见 `docs/discussion/q3-year-end-soc-options.md`；在此之前不得启动正式全年结果运行。
