@@ -97,3 +97,22 @@ export CUMCM_C_ATTACH_DIR=/path/to/C题/附件
 .venv/bin/python q3/validate_q3_sensitivity.py
 ```
 
+## 年末 SOC 边界 12 月试验（A=1200 / B=6000）
+
+依据 `docs/discussion/q3-year-end-soc-pilot-design.md`。结果写入
+`output/q3_terminal_soc_pilot/` 与 `fig/q3_terminal_soc_pilot/`，**不覆盖**
+`q3_pilot/` 或 `q3_sensitivity/`。
+
+这不是全年正式运行：日期仅 2025-12-01 至 2025-12-31；12 月 1 日 00:00 孤立起点
+6000 kWh；主口径固定 `causal_load_main` + `linear_anchor_main` + `anchor_final_main`。
+12 月 31 日所有剩余时域 LP 强制 \(E_{144}=E^{tar}\)；12 月 30 日的 48 小时虚拟次日
+同样强制该目标；12 月 29 日及更早仍用既有 48 小时终端价值。本试验**不**自动选择
+A/B，**不**生成 `result3.xlsx`，**不**实现 M5。
+
+```bash
+export CUMCM_C_ATTACH_DIR=/path/to/C题/附件
+.venv/bin/python -m unittest q3.test_q3 -v
+.venv/bin/python q3/run_q3_terminal_soc_pilot.py
+.venv/bin/python q3/validate_q3_terminal_soc_pilot.py
+```
+

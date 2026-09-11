@@ -74,6 +74,59 @@ SETTLEMENT_MODES = (SETTLEMENT_MAIN, SETTLEMENT_ALT)
 SENSITIVITY_OUTPUT_DIR = ROOT / "output" / "q3_sensitivity"
 SENSITIVITY_FIG_DIR = ROOT / "fig" / "q3_sensitivity"
 
+YEAR_N_DAYS = 365
+YEAR_END_SOC_A_KWH = 1200.0
+YEAR_END_SOC_B_KWH = 6000.0
+YEAR_END_BOUNDARY_A = "A_q2_aligned"
+YEAR_END_BOUNDARY_B = "B_energy_neutral"
+YEAR_END_BOUNDARIES = (
+    (YEAR_END_BOUNDARY_A, YEAR_END_SOC_A_KWH),
+    (YEAR_END_BOUNDARY_B, YEAR_END_SOC_B_KWH),
+)
+TERMINAL_SOC_PILOT_START = "2025-12-01"
+TERMINAL_SOC_PILOT_END = "2025-12-31"
+TERMINAL_SOC_OUTPUT_DIR = ROOT / "output" / "q3_terminal_soc_pilot"
+TERMINAL_SOC_FIG_DIR = ROOT / "fig" / "q3_terminal_soc_pilot"
+
+
+def year_end_tag(year_end_soc_kwh: float | None) -> str:
+    if year_end_soc_kwh is None:
+        return ""
+    return f"ye{int(round(float(year_end_soc_kwh)))}"
+
+
+def year_end_boundary_label(year_end_soc_kwh: float | None) -> str | None:
+    if year_end_soc_kwh is None:
+        return None
+    value = float(year_end_soc_kwh)
+    if abs(value - YEAR_END_SOC_A_KWH) <= 1e-9:
+        return YEAR_END_BOUNDARY_A
+    if abs(value - YEAR_END_SOC_B_KWH) <= 1e-9:
+        return YEAR_END_BOUNDARY_B
+    return f"custom_{value:.0f}"
+
+
+def today_year_end_soc(
+    day_index: int, n_days: int, year_end_soc_kwh: float | None
+) -> float | None:
+    """Hard E_144 target for remaining-horizon LPs on the calendar year's last day."""
+    if year_end_soc_kwh is None:
+        return None
+    if int(day_index) == int(n_days) - 1:
+        return float(year_end_soc_kwh)
+    return None
+
+
+def next_day_year_end_soc(
+    day_index: int, n_days: int, year_end_soc_kwh: float | None
+) -> float | None:
+    """Hard E_144 target for the virtual next-day LP on Dec 30 (48h cost-to-go)."""
+    if year_end_soc_kwh is None:
+        return None
+    if int(day_index) == int(n_days) - 2:
+        return float(year_end_soc_kwh)
+    return None
+
 
 def make_run_id(
     date: str,
@@ -82,12 +135,17 @@ def make_run_id(
     pv_mapping_mode: str,
     settlement_mode: str,
     with_terminal_value: bool,
+    year_end_soc_kwh: float | None = None,
 ) -> str:
     tv = "48h" if with_terminal_value else "no48h"
-    return (
+    run_id = (
         f"{date}__{strategy}__{load_information_case}__"
         f"{pv_mapping_mode}__{settlement_mode}__{tv}"
     )
+    tag = year_end_tag(year_end_soc_kwh)
+    if tag:
+        run_id += f"__{tag}"
+    return run_id
 
 
 def dispatch_stem(
@@ -97,10 +155,14 @@ def dispatch_stem(
     pv_mapping_mode: str,
     settlement_mode: str,
     with_terminal_value: bool,
+    year_end_soc_kwh: float | None = None,
 ) -> str:
     suffix = f"{strategy}_{load_information_case}_{pv_mapping_mode}_{settlement_mode}"
     if not with_terminal_value:
         suffix += "_no48h"
+    tag = year_end_tag(year_end_soc_kwh)
+    if tag:
+        suffix += f"_{tag}"
     return f"q3_dispatch_{date}_{suffix}"
 
 # Update clock hours and the first 10-minute index that may change.

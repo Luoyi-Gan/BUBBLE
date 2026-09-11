@@ -37,6 +37,9 @@ from q3.config import (
     VOI_EPS_YUAN,
     WARMUP_CSV_MAIN,
     make_run_id,
+    next_day_year_end_soc,
+    today_year_end_soc,
+    year_end_boundary_label,
 )
 from q3.data import Q3Data
 from q3.forecast import (
@@ -73,7 +76,7 @@ ORANGE = "#e09f3e"
 PURPLE = "#6d597a"
 
 
-ValueCutCache = dict[tuple[int, int, str], tuple[tuple[ValueCut, ...], list[dict]]]
+ValueCutCache = dict[tuple[int, int, str, str], tuple[tuple[ValueCut, ...], list[dict]]]
 
 
 @dataclass
@@ -90,6 +93,7 @@ class DayRun:
     ledger: pd.DataFrame
     summary: dict
     next_day_value_rows: list[dict] = field(default_factory=list)
+    year_end_soc_kwh: float | None = None
 
 
 def dispatch_output_stem(date: str, strategy: str, load_information_case: str, with_terminal_value: bool) -> str:
@@ -104,6 +108,7 @@ def build_next_day_value_cuts(
     current_index: int,
     issue_hour: int,
     pv_mapping_mode: str = PV_MAPPING_LINEAR,
+    next_day_terminal_soc: float | None = None,
 ) -> tuple[tuple[ValueCut, ...], list[dict]]:
     if current_index + 1 >= len(data.dates):
         return (), []
@@ -121,6 +126,7 @@ def build_next_day_value_cuts(
             float(soc),
             bill_as_day_ahead=True,
             throughput_tiebreak=False,
+            terminal_soc=next_day_terminal_soc,
         )
         value = result.settlement_cost + result.emergency_cost
         solved[float(soc)] = (float(soc), float(value), float(result.initial_soc_marginal))
@@ -176,6 +182,9 @@ def build_next_day_value_cuts(
             "target_date": target,
             "issue_hour": issue_hour,
             "pv_mapping_mode": pv_mapping_mode,
+            "next_day_terminal_soc_kwh": (
+                None if next_day_terminal_soc is None else float(next_day_terminal_soc)
+            ),
             "soc_sample_kwh": reference,
             "virtual_next_day_cost_yuan": value,
             "value_subgradient_yuan_per_kwh": slope,
@@ -203,6 +212,7 @@ def _run_key_fields(
     settlement_mode: str,
     with_terminal_value: bool,
     run_id: str,
+    year_end_soc_kwh: float | None = None,
 ) -> dict:
     return {
         "date": date,
@@ -211,6 +221,8 @@ def _run_key_fields(
         "pv_mapping_mode": pv_mapping_mode,
         "settlement_mode": settlement_mode,
         "with_terminal_value": with_terminal_value,
+        "year_end_soc_kwh": None if year_end_soc_kwh is None else float(year_end_soc_kwh),
+        "year_end_boundary": year_end_boundary_label(year_end_soc_kwh),
         "run_id": run_id,
     }
 
@@ -228,6 +240,7 @@ def _settlement_ledger_rows(
     versions: list[np.ndarray],
     version_times: list[str],
     dispatch: pd.DataFrame,
+    year_end_soc_kwh: float | None = None,
 ) -> list[dict]:
     keys = _run_key_fields(
         date,
@@ -237,6 +250,7 @@ def _settlement_ledger_rows(
         settlement_mode,
         with_terminal_value,
         run_id,
+        year_end_soc_kwh,
     )
     ordinary, up_fee, down_fee = decompose_settlement(price, versions, settlement_mode)
     emergency = dispatch["emergency_cost_yuan"].to_numpy()
@@ -351,17 +365,30 @@ def _settlement_ledger_rows(
     return rows
 
 
+def _value_cut_cache_key(
+    day_index: int,
+    issue_hour: int,
+    pv_mapping_mode: str,
+    next_day_terminal_soc: float | None = None,
+) -> tuple[int, int, str, str]:
+    term = "" if next_day_terminal_soc is None else f"{float(next_day_terminal_soc):.6f}"
+    return (int(day_index), int(issue_hour), str(pv_mapping_mode), term)
+
+
 def _next_day_value_cuts(
     data: Q3Data,
     day_index: int,
     issue_hour: int,
     cache: ValueCutCache | None,
     pv_mapping_mode: str = PV_MAPPING_LINEAR,
+    next_day_terminal_soc: float | None = None,
 ) -> tuple[tuple[ValueCut, ...], list[dict]]:
-    key = (day_index, issue_hour, pv_mapping_mode)
+    key = _value_cut_cache_key(day_index, issue_hour, pv_mapping_mode, next_day_terminal_soc)
     if cache is not None and key in cache:
         return cache[key]
-    cuts, rows = build_next_day_value_cuts(data, day_index, issue_hour, pv_mapping_mode)
+    cuts, rows = build_next_day_value_cuts(
+        data, day_index, issue_hour, pv_mapping_mode, next_day_terminal_soc
+    )
     if cache is not None:
         cache[key] = (cuts, rows)
     return cuts, rows
@@ -377,6 +404,7 @@ def run_day(
     pv_mapping_mode: str = PV_MAPPING_LINEAR,
     settlement_mode: str = SETTLEMENT_MAIN,
     value_cut_cache: ValueCutCache | None = None,
+    year_end_soc_kwh: float | None = None,
 ) -> DayRun:
     date = data.dates[day_index].strftime("%Y-%m-%d")
     run_id = make_run_id(
@@ -386,7 +414,11 @@ def run_day(
         pv_mapping_mode,
         settlement_mode,
         with_terminal_value,
+        year_end_soc_kwh,
     )
+    n_days = len(data.dates)
+    today_terminal = today_year_end_soc(day_index, n_days, year_end_soc_kwh)
+    next_terminal = next_day_year_end_soc(day_index, n_days, year_end_soc_kwh)
     allowed = STRATEGY_ALLOWED_UPDATES[strategy]
     price = data.price
     actual_load = data.load[day_index]
@@ -400,7 +432,7 @@ def run_day(
     value_rows: list[dict] = []
     if with_terminal_value:
         cuts, rows = _next_day_value_cuts(
-            data, day_index, 0, value_cut_cache, pv_mapping_mode
+            data, day_index, 0, value_cut_cache, pv_mapping_mode, next_terminal
         )
         value_rows.extend(rows)
 
@@ -411,6 +443,7 @@ def run_day(
         initial_soc,
         bill_as_day_ahead=True,
         terminal_value_cuts=cuts or None,
+        terminal_soc=today_terminal,
     )
     assert_physical(midnight, plan_load, current_forecast, prefix=f"{date} 0:00 plan ")
     g0 = midnight.g.copy()
@@ -424,6 +457,7 @@ def run_day(
             "settlement_mode": settlement_mode,
             "terminal_value_cuts": cuts or None,
             "g0": g0[t:],
+            "terminal_soc": today_terminal,
         }
         if settlement_mode == SETTLEMENT_ALT:
             kwargs["g_pre"] = g_pre_rem
@@ -471,7 +505,7 @@ def run_day(
             current_forecast = mapped.today_kwh.copy()
             if with_terminal_value:
                 cuts, rows = _next_day_value_cuts(
-                    data, day_index, hour, value_cut_cache, pv_mapping_mode
+                    data, day_index, hour, value_cut_cache, pv_mapping_mode, next_terminal
                 )
                 value_rows.extend(rows)
             pv_plan = current_forecast[t:]
@@ -587,6 +621,8 @@ def run_day(
     dispatch["run_id"] = run_id
     dispatch["pv_mapping_mode"] = pv_mapping_mode
     dispatch["settlement_mode"] = settlement_mode
+    dispatch["year_end_soc_kwh"] = None if year_end_soc_kwh is None else float(year_end_soc_kwh)
+    dispatch["year_end_boundary"] = year_end_boundary_label(year_end_soc_kwh)
     ledger = pd.DataFrame(
         _settlement_ledger_rows(
             date=date,
@@ -601,6 +637,7 @@ def run_day(
             versions=versions,
             version_times=version_times,
             dispatch=dispatch,
+            year_end_soc_kwh=year_end_soc_kwh,
         )
     )
     update_log = pd.DataFrame(update_rows)
@@ -609,7 +646,9 @@ def run_day(
     update_log.insert(3, "pv_mapping_mode", pv_mapping_mode)
     update_log.insert(4, "settlement_mode", settlement_mode)
     update_log.insert(5, "with_terminal_value", with_terminal_value)
-    update_log.insert(6, "run_id", run_id)
+    update_log.insert(6, "year_end_soc_kwh", None if year_end_soc_kwh is None else float(year_end_soc_kwh))
+    update_log.insert(7, "year_end_boundary", year_end_boundary_label(year_end_soc_kwh))
+    update_log.insert(8, "run_id", run_id)
     n_adjust = int(((update_log["update_time"] != "00:00") & update_log["implemented"]).sum())
     summary = {
         "date": date,
@@ -618,12 +657,16 @@ def run_day(
         "pv_mapping_mode": pv_mapping_mode,
         "settlement_mode": settlement_mode,
         "with_terminal_value": with_terminal_value,
+        "year_end_soc_kwh": None if year_end_soc_kwh is None else float(year_end_soc_kwh),
+        "year_end_boundary": year_end_boundary_label(year_end_soc_kwh),
         "run_id": run_id,
         "total_cost_yuan": float(dispatch["phi_yuan"].sum() + dispatch["emergency_cost_yuan"].sum()),
         "settlement_cost_yuan": float(dispatch["phi_yuan"].sum()),
         "emergency_cost_yuan": float(dispatch["emergency_cost_yuan"].sum()),
         "curtailment_kwh": float(dispatch["curtailment_kwh"].sum()),
         "emergency_kwh": float(dispatch["emergency_kwh"].sum()),
+        "charge_kwh": float(dispatch["charge_kwh"].sum()),
+        "discharge_kwh": float(dispatch["discharge_kwh"].sum()),
         "soc_start_kwh": float(initial_soc),
         "soc_end_kwh": float(dispatch["soc_kwh"].iloc[-1]),
         "adjustment_count": n_adjust,
@@ -658,6 +701,7 @@ def run_day(
         ledger,
         summary,
         value_rows,
+        year_end_soc_kwh,
     )
 
 
@@ -908,6 +952,8 @@ def physical_audit(runs: list[DayRun], warmup_end_soc: float | None) -> dict:
             "pv_mapping_mode": run.pv_mapping_mode,
             "settlement_mode": run.settlement_mode,
             "with_terminal_value": run.with_terminal_value,
+            "year_end_soc_kwh": run.year_end_soc_kwh,
+            "year_end_boundary": year_end_boundary_label(run.year_end_soc_kwh),
             "run_id": run.run_id,
             "max_balance_residual_kwh": run.summary["max_balance_residual_kwh"],
             "max_soc_residual_kwh": run.summary["max_soc_residual_kwh"],

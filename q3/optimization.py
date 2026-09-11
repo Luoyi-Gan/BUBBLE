@@ -169,6 +169,7 @@ def solve_horizon(
     settlement_mode: str = SETTLEMENT_MAIN,
     g_pre: np.ndarray | None = None,
     sunk_settlement: float = 0.0,
+    terminal_soc: float | None = None,
 ) -> HorizonResult:
     """Solve a remaining-horizon LP.
 
@@ -177,6 +178,9 @@ def solve_horizon(
     - anchor_final_main: phi(g0, g) = p g + 0.5 p |g-g0|
     - adjacent_literal_sensitivity: sunk p g0 + prior adjacent fees, plus
       1.5 p (g-g_pre)_+ + 0.5 p (g_pre-g)_+ for this update only.
+
+    If terminal_soc is set, the last SOC node of this remaining horizon
+    (end of the current calendar day) is constrained to that value.
     """
     n = len(load)
     price = np.asarray(price, dtype=float).ravel()
@@ -187,6 +191,8 @@ def solve_horizon(
     E = cp.Variable(n + 1)
     constraints = _physical_constraints(load, pv, initial_soc, x, e, c, d, w, E)
     constraints.append(x <= g)
+    if terminal_soc is not None:
+        constraints.append(E[-1] == float(terminal_soc))
 
     if g_fixed is not None:
         fixed = np.asarray(g_fixed, dtype=float).ravel()
@@ -230,7 +236,13 @@ def solve_horizon(
     started = perf_counter()
     problem.solve(solver=SOLVER, verbose=False)
     if g.value is None:
-        raise RuntimeError(f"Q3 horizon LP failed: {problem.status}")
+        extra = ""
+        if terminal_soc is not None:
+            extra = (
+                f" (terminal_soc={float(terminal_soc):.6f} kWh, "
+                f"n={n}, initial_soc={float(initial_soc):.6f} kWh)"
+            )
+        raise RuntimeError(f"Q3 horizon LP failed: {problem.status}{extra}")
     status = str(problem.status)
     primary_opt = float(primary.value)
     if throughput_tiebreak:

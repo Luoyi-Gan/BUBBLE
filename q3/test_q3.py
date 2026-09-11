@@ -19,6 +19,11 @@ from q3.config import (
     SETTLEMENT_ALT,
     SETTLEMENT_MAIN,
     T,
+    YEAR_N_DAYS,
+    dispatch_stem,
+    make_run_id,
+    next_day_year_end_soc,
+    today_year_end_soc,
 )
 from q3.data import load_q3_data, period_end_minutes
 from q3.forecast import (
@@ -283,6 +288,140 @@ class MappingSensitivityTests(unittest.TestCase):
         for mode in (PV_MAPPING_LINEAR, PV_MAPPING_STEP):
             np.testing.assert_allclose(befores[mode].today_kwh[36:], afters[mode].today_kwh[36:])
             np.testing.assert_allclose(befores[mode].next_day_kwh, afters[mode].next_day_kwh)
+
+
+class YearEndSocHelperTests(unittest.TestCase):
+    def test_make_run_id_without_year_end_unchanged(self) -> None:
+        old = make_run_id(
+            "2025-02-01",
+            "M1_M6",
+            LOAD_INFORMATION_MAIN,
+            PV_MAPPING_LINEAR,
+            SETTLEMENT_MAIN,
+            True,
+        )
+        self.assertEqual(
+            old,
+            "2025-02-01__M1_M6__causal_load_main__linear_anchor_main__anchor_final_main__48h",
+        )
+        self.assertEqual(
+            dispatch_stem(
+                "2025-02-01",
+                "M1_M6",
+                LOAD_INFORMATION_MAIN,
+                PV_MAPPING_LINEAR,
+                SETTLEMENT_MAIN,
+                True,
+            ),
+            "q3_dispatch_2025-02-01_M1_M6_causal_load_main_linear_anchor_main_anchor_final_main",
+        )
+
+    def test_make_run_id_appends_year_end_tag(self) -> None:
+        run_id = make_run_id(
+            "2025-12-31",
+            "M0",
+            LOAD_INFORMATION_MAIN,
+            PV_MAPPING_LINEAR,
+            SETTLEMENT_MAIN,
+            True,
+            1200.0,
+        )
+        self.assertTrue(run_id.endswith("__ye1200"))
+        stem = dispatch_stem(
+            "2025-12-31",
+            "M0",
+            LOAD_INFORMATION_MAIN,
+            PV_MAPPING_LINEAR,
+            SETTLEMENT_MAIN,
+            True,
+            1200.0,
+        )
+        self.assertTrue(stem.endswith("_ye1200"))
+
+    def test_year_end_constraint_days(self) -> None:
+        self.assertEqual(YEAR_N_DAYS, 365)
+        self.assertEqual(today_year_end_soc(364, 365, 1200.0), 1200.0)
+        self.assertIsNone(today_year_end_soc(363, 365, 1200.0))
+        self.assertEqual(next_day_year_end_soc(363, 365, 6000.0), 6000.0)
+        self.assertIsNone(next_day_year_end_soc(362, 365, 6000.0))
+        self.assertIsNone(today_year_end_soc(364, 365, None))
+
+    def test_value_cut_cache_key_splits_dec30_boundaries(self) -> None:
+        from q3.pilot import _value_cut_cache_key
+
+        shared = _value_cut_cache_key(333, 0, PV_MAPPING_LINEAR, None)
+        a = _value_cut_cache_key(363, 0, PV_MAPPING_LINEAR, 1200.0)
+        b = _value_cut_cache_key(363, 0, PV_MAPPING_LINEAR, 6000.0)
+        self.assertEqual(shared[-1], "")
+        self.assertNotEqual(a, b)
+        self.assertEqual(shared, _value_cut_cache_key(333, 0, PV_MAPPING_LINEAR))
+
+    def test_solve_horizon_hits_hard_terminal_soc(self) -> None:
+        n = 12
+        price = np.full(n, 0.4)
+        load = np.full(n, 80.0)
+        pv = np.zeros(n)
+        target = 5000.0
+        result = solve_horizon(
+            price,
+            load,
+            pv,
+            E_INITIAL_KWH,
+            bill_as_day_ahead=True,
+            terminal_soc=target,
+        )
+        self.assertAlmostEqual(float(result.soc[-1]), target, places=5)
+        self.assertLessEqual(float(result.max_cd), 1e-4)
+
+
+@unittest.skipUnless(ATTACH1.exists() and ATTACH3.exists(), "C-problem attachments unavailable")
+class YearEndSocAttachmentTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.data = load_q3_data()
+
+    def test_december_indices_match_year_end_rules(self) -> None:
+        self.assertEqual(len(self.data.dates), YEAR_N_DAYS)
+        self.assertEqual(self.data.date_index("2025-12-31"), YEAR_N_DAYS - 1)
+        self.assertEqual(self.data.date_index("2025-12-30"), YEAR_N_DAYS - 2)
+        self.assertEqual(self.data.date_index("2025-12-29"), YEAR_N_DAYS - 3)
+        self.assertEqual(self.data.date_index("2025-12-01"), 334)
+
+    def test_dec31_virtual_next_day_from_dec30_hits_target(self) -> None:
+        from q3.forecast import causal_load_forecast, next_day_pv_forecast
+
+        dec30 = self.data.date_index("2025-12-30")
+        load = causal_load_forecast(self.data, dec30 + 1, dec30)
+        pv = next_day_pv_forecast(self.data, dec30, 0, PV_MAPPING_LINEAR)
+        result = solve_horizon(
+            self.data.price,
+            load,
+            pv,
+            7000.0,
+            bill_as_day_ahead=True,
+            terminal_soc=1200.0,
+        )
+        self.assertAlmostEqual(float(result.soc[-1]), 1200.0, places=5)
+
+    def test_dec31_m0_run_day_hits_1200(self) -> None:
+        from q3.pilot import run_day
+
+        i = self.data.date_index("2025-12-31")
+        run = run_day(
+            self.data,
+            i,
+            "M0",
+            E_INITIAL_KWH,
+            with_terminal_value=True,
+            load_information_case=LOAD_INFORMATION_MAIN,
+            pv_mapping_mode=PV_MAPPING_LINEAR,
+            settlement_mode=SETTLEMENT_MAIN,
+            year_end_soc_kwh=1200.0,
+        )
+        self.assertAlmostEqual(float(run.summary["soc_end_kwh"]), 1200.0, places=5)
+        self.assertIn("ye1200", run.run_id)
+        self.assertLess(float(run.summary["max_balance_residual_kwh"]), 1e-5)
+        self.assertEqual(int(run.summary["locked_period_violations"]), 0)
 
 
 if __name__ == "__main__":
