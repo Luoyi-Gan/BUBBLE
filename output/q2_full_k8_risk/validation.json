@@ -1,0 +1,22 @@
+{
+  "status": "PASS",
+  "policy": "fixed K=8 plus 14-day causal rolling risk-quantile reserve",
+  "days": 365,
+  "total_cost_yuan": 16340942.809088603,
+  "planned_cost_yuan": 14189650.615047198,
+  "emergency_cost_yuan": 2151292.194041404,
+  "emergency_kwh": 597746.6645199438,
+  "unused_plan_kwh": 1265721.220617535,
+  "curtailment_kwh": 1378285.719982011,
+  "max_balance_residual_kwh": 1.333546606474556e-10,
+  "max_simultaneous_cd_kwh2": 0.0,
+  "max_x_minus_q_kwh": 0.0,
+  "max_cross_day_soc_gap_kwh": 0.0,
+  "selected_alpha_periods": {
+    "0.6": 323,
+    "0.7": 14,
+    "no_reserve": 28
+  },
+  "max_value_cut_gap_yuan": 0.9999857953589526,
+  "elapsed_seconds": 1185.4802316249989
+}

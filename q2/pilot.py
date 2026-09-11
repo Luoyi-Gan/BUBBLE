@@ -18,6 +18,8 @@ from q2.config import (
     FIG_DIR,
     K_CANDIDATES,
     K_VALIDATION_DAYS,
+    RISK_ALPHA_CANDIDATES,
+    RISK_CALIBRATION_DAYS,
     NEXT_DAY_VALUE_GAP_TOL_YUAN,
     NEXT_DAY_VALUE_MAX_SAMPLES,
     NUMERIC_TOL,
@@ -62,11 +64,51 @@ class FreezeCalendar:
     rows: tuple[dict, ...]
 
 
+@dataclass(frozen=True)
+class RiskChoice:
+    target_index: int
+    selected_alpha: float
+    rows: tuple[dict, ...]
+
+
 def planned_q_hash(q: np.ndarray) -> str:
     # Decimal canonicalization survives CSV round-trips while detecting any
     # operationally meaningful mutation of the locked plan.
     canonical = ",".join(f"{float(value):.9f}" for value in np.asarray(q).ravel())
     return hashlib.sha256(canonical.encode("ascii")).hexdigest()
+
+
+def _weighted_quantile(values: np.ndarray, weights: np.ndarray, alpha: float) -> float:
+    order = np.argsort(values)
+    cumulative = np.cumsum(weights[order])
+    return float(values[order][np.searchsorted(cumulative, alpha, side="left")])
+
+
+def risk_quantile_floor(
+    scenario_load: np.ndarray,
+    scenario_pv: np.ndarray,
+    probabilities: np.ndarray,
+    base_load: np.ndarray,
+    base_pv: np.ndarray,
+    alpha: float | None,
+) -> np.ndarray:
+    """Nonnegative high-net-load residual reserve for the locked normal plan."""
+    if alpha is None:
+        return np.zeros(scenario_load.shape[1])
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("risk alpha must lie strictly between 0 and 1")
+    residual_net = (
+        scenario_load - scenario_pv - (base_load[None, :] - base_pv[None, :])
+    )
+    return np.maximum(
+        np.array(
+            [
+                _weighted_quantile(residual_net[:, t], probabilities, alpha)
+                for t in range(residual_net.shape[1])
+            ]
+        ),
+        0.0,
+    )
 
 
 def scenario_inputs_as_of(
@@ -125,6 +167,7 @@ def build_next_day_value_cuts(
     archive: ForecastArchive,
     current_index: int,
     k: int,
+    risk_alpha: float | None = None,
 ) -> tuple[tuple[ValueCut, ...], list[dict]]:
     if current_index + 1 >= len(data.dates):
         return (), []
@@ -136,10 +179,18 @@ def build_next_day_value_cuts(
         history_end_exclusive=current_index,
         k=k,
     )
+    base_load, base_pv, _load_sources, _pv_sources = forecast_as_of(
+        data, current_index + 1, current_index
+    )
+    q_floor = risk_quantile_floor(
+        loads, pvs, probabilities, base_load, base_pv, risk_alpha
+    )
     solved: dict[float, ValueCut] = {}
 
     def solve_at(soc: float) -> None:
-        result = solve_stochastic_plan(data.price, loads, pvs, probabilities, float(soc))
+        result = solve_stochastic_plan(
+            data.price, loads, pvs, probabilities, float(soc), q_floor=q_floor
+        )
         value = result.planned_cost + result.expected_emergency_cost
         solved[float(soc)] = (
             float(soc),
@@ -202,6 +253,8 @@ def build_next_day_value_cuts(
             "certified_max_gap_yuan": gap,
             "gap_tolerance_yuan": NEXT_DAY_VALUE_GAP_TOL_YUAN,
             "bundle_sample_count": len(cuts),
+            "risk_alpha": risk_alpha,
+            "risk_q_floor_kwh": float(q_floor.sum()),
         }
         for reference, value, slope in cuts
     ]
@@ -262,11 +315,25 @@ def _validation_score(
     day_start_soc: np.ndarray,
     validation_index: int,
     k: int,
+    risk_alpha: float | None = None,
 ) -> tuple[float, float, float]:
     scenarios = build_scenarios(validation_index, data, archive, k)
     loads, pvs = scenario_trajectories(scenarios, archive)
+    q_floor = risk_quantile_floor(
+        loads,
+        pvs,
+        scenarios.probabilities,
+        archive.load_hat[validation_index],
+        archive.pv_hat[validation_index],
+        risk_alpha,
+    )
     plan = solve_stochastic_plan(
-        data.price, loads, pvs, scenarios.probabilities, day_start_soc[validation_index]
+        data.price,
+        loads,
+        pvs,
+        scenarios.probabilities,
+        day_start_soc[validation_index],
+        q_floor=q_floor,
     )
     execution = solve_fixed_plan_dispatch(
         data.price,
@@ -277,6 +344,57 @@ def _validation_score(
     )
     actual_cost = plan.planned_cost + execution.emergency_cost
     return actual_cost, float(execution.emergency.sum()), plan.solve_seconds + execution.solve_seconds
+
+
+def select_risk_alpha(
+    data: Q2Data,
+    archive: ForecastArchive,
+    policy_day_start_soc: np.ndarray,
+    target_index: int,
+    k: int,
+) -> RiskChoice:
+    """Choose the risk reserve by strictly prior 14-day realised-cost scores."""
+    validation = np.arange(
+        max(1, target_index - RISK_CALIBRATION_DAYS), target_index
+    )
+    records: list[dict] = []
+    for alpha in RISK_ALPHA_CANDIDATES:
+        costs, emergency, times = [], [], []
+        for i in validation:
+            cost, e, seconds = _validation_score(
+                data,
+                archive,
+                policy_day_start_soc,
+                int(i),
+                k,
+                risk_alpha=float(alpha),
+            )
+            costs.append(cost)
+            emergency.append(e)
+            times.append(seconds)
+        records.append(
+            {
+                "risk_alpha": float(alpha),
+                "validation_days": len(validation),
+                "mean_validation_cost_yuan": float(np.mean(costs)),
+                "standard_error_yuan": float(
+                    np.std(costs, ddof=1) / sqrt(len(costs)) if len(costs) > 1 else 0.0
+                ),
+                "emergency_purchase_kwh": float(np.sum(emergency)),
+                "mean_solve_seconds": float(np.mean(times)),
+                "within_time_limit": bool(
+                    T_MAX_SECONDS is None or np.mean(times) <= T_MAX_SECONDS
+                ),
+                "selected": False,
+            }
+        )
+    eligible = [row for row in records if row["within_time_limit"]]
+    selected = min(
+        eligible or records,
+        key=lambda row: (row["mean_validation_cost_yuan"], row["risk_alpha"]),
+    )
+    selected["selected"] = True
+    return RiskChoice(target_index, float(selected["risk_alpha"]), tuple(records))
 
 
 def select_dynamic_k(
@@ -430,6 +548,7 @@ def run_posterior_mpc(
     path: Path | None,
     terminal_value_cuts: tuple[ValueCut, ...] | None = None,
     variant: str = "with_48h_value",
+    risk_alpha: float | None = None,
 ) -> dict:
     if choice is None:
         i = 0
@@ -438,12 +557,21 @@ def run_posterior_mpc(
         scenario_pv = archive.pv_hat[i][None, :]
         probabilities = np.ones(1)
         selected_k = 1
+        q_floor = np.zeros(T)
     else:
         i = choice.target_index
         scenarios = choice.scenarios
         scenario_load, scenario_pv = scenario_trajectories(scenarios, archive)
         probabilities = scenarios.probabilities
         selected_k = choice.selected_k
+        q_floor = risk_quantile_floor(
+            scenario_load,
+            scenario_pv,
+            probabilities,
+            archive.load_hat[i],
+            archive.pv_hat[i],
+            risk_alpha,
+        )
     plan = solve_stochastic_plan(
         data.price,
         scenario_load,
@@ -451,6 +579,7 @@ def run_posterior_mpc(
         probabilities,
         initial_soc,
         terminal_value_cuts=terminal_value_cuts,
+        q_floor=q_floor,
     )
     locked_q = plan.q.copy()
     locked_q_sha256 = planned_q_hash(locked_q)
@@ -533,6 +662,8 @@ def run_posterior_mpc(
         "date": data.dates[i].strftime("%Y-%m-%d"),
         "variant": variant,
         "selected_k": selected_k,
+        "risk_alpha": risk_alpha,
+        "risk_q_floor_kwh": float(q_floor.sum()),
         "planned_cost_yuan": plan.planned_cost,
         "emergency_cost_yuan": float(
             np.sum(

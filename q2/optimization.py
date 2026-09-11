@@ -148,12 +148,18 @@ def solve_stochastic_plan(
     probabilities: np.ndarray,
     initial_soc: float,
     terminal_value_cuts: tuple[ValueCut, ...] | None = None,
+    q_floor: np.ndarray | None = None,
 ) -> PlanResult:
     k, n = scenario_load.shape
     q = cp.Variable(n, nonneg=True)
     expected_emergency = 0
     expected_terminal_value: cp.Expression | float = 0.0
     constraints: list[cp.Constraint] = []
+    if q_floor is not None:
+        floor = np.asarray(q_floor, dtype=float).ravel()
+        if floor.shape != (n,) or np.any(floor < -1e-9):
+            raise ValueError("q_floor must be a nonnegative vector matching the horizon")
+        constraints.append(q >= floor)
     initial_constraints: list[cp.Constraint] = []
     for omega in range(k):
         x, e, c, d, w = (cp.Variable(n, nonneg=True) for _ in range(5))
@@ -274,4 +280,3 @@ def dispatch_balance_residual(
         - load
         - result.charge
     )
-

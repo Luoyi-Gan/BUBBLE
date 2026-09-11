@@ -42,3 +42,5 @@ data/raw/*
 .mplconfig/
 output/q2_full_linked/dispatch_daily/
 output/q2_full_linked/forecast_archive.csv
+output/q2_full_k8_risk/dispatch_daily/
+output/q2_full_k8_risk/forecast_archive.csv

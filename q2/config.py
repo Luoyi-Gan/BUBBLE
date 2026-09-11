@@ -15,6 +15,7 @@ ATTACH1 = ATTACH_DIR / "附件1.xlsx"
 ATTACH2 = ATTACH_DIR / "附件2.xlsx"
 OUTPUT_DIR = ROOT / "output" / "q2_pilot"
 FULL_OUTPUT_DIR = ROOT / "output" / "q2_full_linked"
+FULL_K8_RISK_OUTPUT_DIR = ROOT / "output" / "q2_full_k8_risk"
 FIG_DIR = ROOT / "fig" / "q2_pilot"
 
 T = 144
@@ -41,6 +42,9 @@ K_RECALIBRATION_DAYS = 14
 # Fixed from the R1--R4 timing audit: a validation-day score must be obtained
 # within this budget before its K is eligible under the one-standard-error rule.
 T_MAX_SECONDS: float | None = 0.20
+FIXED_SCENARIO_K = 8
+RISK_ALPHA_CANDIDATES = (0.60, 0.70, 0.80, 0.90)
+RISK_CALIBRATION_DAYS = 14
 MPC_COST_TOL = 1e-7
 NEXT_DAY_VALUE_GAP_TOL_YUAN = 1.0
 NEXT_DAY_VALUE_MAX_SAMPLES = 25

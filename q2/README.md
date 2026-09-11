@@ -44,9 +44,14 @@ SOC 连续的逐日完美信息比较器；由于它和待定的 48 小时主方
 ```bash
 python q2/run_q2_full.py
 python q2/run_q2_comparators.py
+python q2/run_q2_k8_risk.py
 ```
 
 `run_q2_full.py` 每 14 日仅用此前主策略已执行的 SOC 轨迹评分并冻结 K，顺序运行全年的
 日前计划与日内 MPC。它输出到 `output/q2_full_linked/`，仍不会生成 `result2.xlsx`。
 `run_q2_comparators.py` 随后计算无储能联动基线和逐日完美信息比较器。完整年度结果的解释和
 物理审计见 `docs/reviews/q2-full-linked-audit.md`。
+
+`run_q2_k8_risk.py` 保留旧方案不覆盖，输出固定 K=8 与滚动风险分位候选方案到
+`output/q2_full_k8_risk/`。K=8 的验证依据、早期 K=1 回退和成本复核见
+`docs/reviews/q2-k8-risk-recalculation.md`。
