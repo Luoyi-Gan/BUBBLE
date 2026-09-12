@@ -18,6 +18,7 @@ FULL_OUTPUT_DIR = ROOT / "output" / "q2_full_linked"
 FULL_K8_RISK_OUTPUT_DIR = ROOT / "output" / "q2_full_k8_risk"
 POLICY_CONSISTENT_OUTPUT_DIR = ROOT / "output" / "q2_policy_consistent"
 FIG_DIR = ROOT / "fig" / "q2_pilot"
+FIG_POLICY_CONSISTENT_DIR = ROOT / "fig" / "q2_policy_consistent"
 
 T = 144
 DELTA_H = 1.0 / 6.0
@@ -44,7 +45,9 @@ K_RECALIBRATION_DAYS = 14
 # within this budget before its K is eligible under the one-standard-error rule.
 T_MAX_SECONDS: float | None = 0.20
 FIXED_SCENARIO_K = 8
+K_SENSITIVITY_CANDIDATES = (4, 8, 12)
 RISK_ALPHA_CANDIDATES = (0.60, 0.70, 0.80, 0.90)
+OFFICIAL_OUTPUT_START = "2025-02-01"
 RISK_CALIBRATION_DAYS = 14
 MPC_COST_TOL = 1e-7
 NEXT_DAY_VALUE_GAP_TOL_YUAN = 1.0
