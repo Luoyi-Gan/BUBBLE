@@ -1,11 +1,11 @@
 # 论文数字对账单（ACCT）
 
-> 生成时间：2026-09-12 14:58 UTC；脚本：`scripts/reconcile_paper_numbers.py`
+> 生成时间：2026-09-12 16:29 UTC；脚本：`scripts/reconcile_paper_numbers.py`
 
 ## 签收摘要
 
-- 核对条目：**38**
-- **已核：38**
+- 核对条目：**50**
+- **已核：50**
 - **不一致：0**
 - **未核：0**
 
@@ -15,13 +15,14 @@
 | Q2 | **V2 政策一致 K=8** | `output/result2.xlsx`、`q2_policy_consistent/` | 已核 |
 | Q3 | A边界 + `M1_M6` | `q3_annual_strategy_comparison.csv`、`result3.xlsx` | 已核 |
 | Q4-2 | 波动电价 Q2 链 | `result4-2.xlsx`、`q4_2_*` | 已核 |
-| Q4-3 | 待签收 | — | 未核 |
+| Q4-3 | 固定 \texttt{M1\_M6} + 交付价 | `result4-3.xlsx`、`q4_3_*` | 已核 |
 
 ## 口径提醒（写入摘要前必读）
 
 - Q2：2–12 月 **15,166,538.46 元** 为题设输出区间；1 月预热 **1,977,568.32 元** 须分列，不得相加混报。
 - Q3：全年 **16,373,508.75 元** 为 1–12 月主结论；**14,512,748.53 元** 仅为 `result3.xlsx` 的 2–12 月核对区间。
-- Q4：待 RQ4-C1 与物理审计通过后方可对账。
+- Q4-2：2–12 月 **15,257,873.75 元** 为题设输出区间；与 Q2 V2 同区间差 **+91,335.29 元**。
+- Q4-3：1–12 月 **17,489,808.24 元**；2–12 月 **15,346,418.14 元**。与 Q3 固定价比较须注明价格机制差异，不得混报口径。
 
 ## 逐条对账
 
@@ -65,17 +66,29 @@
 | Q4-2 | `tables/q4/cost_summary.tex` | 2-12月计划成本 | 元 | 2 | 13213373.44 | `output/q4/q4_2_run_metadata.json` | 2-12月计划成本 | 13213373.4386 | **已核** |  |
 | Q4-2 | `tables/q4/cost_summary.tex` | 2-12月紧急成本 | 元 | 2 | 2044500.32 | `output/q4/q4_2_run_metadata.json` | 2-12月紧急成本 | 2044500.31534 | **已核** |  |
 | Q4-2 | `sections/q4/06_validation.tex` | 365日物理审计 | - | - | PASS | `output/q4/q4_2_physical_audit.json` | n_days_pass | 365 | **已核** |  |
+| Q4-3 | `sections/q4/05_results.tex` | 2-12月总成本 | 元/次 | 2 | 15346418.14 | `output/q4/q4_3_run_metadata.json` | 2-12月总成本 | 15346418.1389 | **已核** |  |
+| Q4-3 | `sections/q4/05_results.tex` | 1-12月总成本 | 元/次 | 2 | 17489808.24 | `output/q4/q4_3_run_metadata.json` | 1-12月总成本 | 17489808.2371 | **已核** |  |
+| Q4-3 | `sections/q4/05_results.tex` | 相对Q3增加(1-12) | 元/次 | 2 | 1116299.49 | `output/q4/q4_3_run_metadata.json` | 相对Q3增加(1-12) | 1116299.48708 | **已核** |  |
+| Q4-3 | `sections/q4/05_results.tex` | 相对Q3增加(2-12) | 元/次 | 2 | 833669.61 | `output/q4/q4_3_run_metadata.json` | 相对Q3增加(2-12) | 833669.608918 | **已核** |  |
+| Q4-3 | `sections/q4/05_results.tex` | 相对Q4-2增加(2-12) | 元/次 | 2 | 88544.39 | `output/q4/q4_3_run_metadata.json` | 相对Q4-2增加(2-12) | 88544.3889176 | **已核** |  |
+| Q4-3 | `tables/q4/cost_summary_q43.tex` | 2-12月普通购电 | 元/次 | 2 | 12447748.75 | `output/q4/q4_3_run_metadata.json` | 2-12月普通购电 | 12447748.7525 | **已核** |  |
+| Q4-3 | `tables/q4/cost_summary_q43.tex` | 2-12月调整费 | 元/次 | 2 | 321297.70 | `output/q4/q4_3_run_metadata.json` | 2-12月调整费 | 321297.70144 | **已核** |  |
+| Q4-3 | `tables/q4/cost_summary_q43.tex` | 2-12月紧急成本 | 元/次 | 2 | 2577371.68 | `output/q4/q4_3_run_metadata.json` | 2-12月紧急成本 | 2577371.685 | **已核** |  |
+| Q4-3 | `tables/q4/cost_summary_q43.tex` | 1月预热成本 | 元/次 | 2 | 2143390.10 | `output/q4/q4_3_run_metadata.json` | 1月预热成本 | 2143390.09816 | **已核** |  |
+| Q4-3 | `tables/q4/mechanism_compare_q43.tex` | 全年调整次数 | 元/次 | 0 | 1004 | `output/q4/q4_3_run_metadata.json` | 全年调整次数 | 1004 | **已核** |  |
+| Q4-3 | `sections/q4/06_validation.tex` | 365日物理审计 | - | - | PASS | `output/q4/q4_3_physical_audit.json` | n_days_pass | 365 | **已核** |  |
+| Q4-3 | `sections/q4/06_validation.tex` | 信息集探针 | - | - | PASS | `output/q4/q4_3_info_set_audit.json` | all_pass | True | **已核** |  |
 
 ## 结论
 
-Q1–Q3 正文与表格数字均可在展示精度内回链至正式 `output/` 台账；可进入摘要/评价写作前的数字锁定阶段。
+Q1–Q4 正文与表格数字均可在展示精度内回链至正式 `output/` 台账。
 
 ## ACCT 签收清单
 
 - [x] Q1–Q3 逐条对账（本文件 + `reconciliation_audit.json`）
 - [x] Q1 专用视图：`paper/q1_reconciliation.md`
 - [x] Q4-2 逐条对账
-- [ ] Q4-3 待签收后再对账
+- [x] Q4-3 逐条对账
 - [ ] 摘要/评价写作时再次引用本对账单
 
 **复跑：** `python3 scripts/reconcile_paper_numbers.py`（退出码 0 = 全部已核）
