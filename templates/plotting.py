@@ -10,6 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 FIG = ROOT / "fig"
 
 _CN_FONTS = (
+    "Noto Sans CJK SC",
+    "Noto Sans CJK JP",
+    "Source Han Sans SC",
+    "WenQuanYi Micro Hei",
+    "WenQuanYi Zen Hei",
+    "Droid Sans Fallback",
     "PingFang SC",
     "Heiti SC",
     "STHeiti",
@@ -23,6 +29,7 @@ def use_cjk_font() -> None:
     available = {f.name for f in font_manager.fontManager.ttflist}
     for name in _CN_FONTS:
         if name in available:
+            plt.rcParams["font.family"] = "sans-serif"
             plt.rcParams["font.sans-serif"] = [name, "DejaVu Sans"]
             plt.rcParams["axes.unicode_minus"] = False
             return

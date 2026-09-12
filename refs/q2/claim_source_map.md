@@ -1,62 +1,114 @@
-# Q2 主张—证据映射
+# Q2 Claim–Source Map（FIN 证据链审计版）
 
-本表以当前已签收的 **固定 `K=8` 滚动风险分位方案**为准。`output/q2_full_linked/` 中的动态 K 结果只作旧对照，不与正式方案混写。
+## 1. 版本隔离结论
 
-## 信息结构、预测与场景
+Q2 存在两个不可混写的结果口径。论文引用结果前必须先标注 V1 或 V2；任何未标版本的“Q2 结果”均视为证据链不完整。
 
-| 可写主张 | 项目内直接证据 | 外部依据 | 建议措辞与边界 |
+| 版本 | 方法与定位 | 结果证据 | 当前权限 | 论文处理 |
+|---|---|---|---|---|
+| V1：既有签字结果 | 固定 `K=8` 的既有风险调度；旧文档使用“全路径情景补救近似 + MPC”等表述 | `output/result2.xlsx` 覆盖 2025-02-01 至 12-31（334 日）；`output/q2_full_k8_risk/` 覆盖含 1 月预热的 365 日；`docs/reviews/q2-final-delivery-audit.md` | 当前已签字的正式结果口径 | 不混用 2–12 月工作簿成本与 1–12 月完整核算，不借 V2 文献重释为严格多阶段随机控制 |
+| V2：policy-consistent 候选 | 单一基准预测的日前 LP + `K=8` 风险备用 + 残差匹配 10 min MPC；`m1/m2/m3`、`alpha` 为候选设计 | `docs/specs/q2-policy-consistent-redesign.md`、`output/q2_policy_consistent/validation.md`、`output/q2_policy_consistent/policy_consistency_audit.json` | C2-R2 验证态；`annual_run=false`，`candidate_result2_xlsx=false` | 只能写“候选方法通过 C2-R2 因果/一致性检查”；不得替换 V1，不得写全年正式效果 |
+
+## 2. 高影响主张逐条审计
+
+| 编号 | 论文拟写主张 | 类别 | 证据位置或推导条件 | 外部来源与定位 | 不支持什么 | 处理建议 | 状态 |
+|---|---|---|---|---|---|---|---|
+| Q2-00 | 附件 1 给出单日 144 时段基准字段；附件 2 的“小区负载”“光伏发电实际功率”两表给出 2025-01-01 至 12-31 的 365 日实现序列。 | F | `q2/data.py` 字段/表名校验；`docs/reviews/q2-data-and-forecast-audit.md` 的日期、缺失值与行序审计。 | — | 不支持把附件 2 当作决策时点已知的未来值，也不决定合同语义。 | 附件 2 只按因果历史构造预测或按发生时点用于执行/回测。 | 可直接使用 |
+| Q2-01 | 两阶段随机规划区分先验决策与情景揭示后的补救决策。 | L | 一般方法定义。 | Q2-L1，Ch.2 “Two-stage problems”。 | 不证明 V1 是严格两阶段或多阶段模型。 | 仅在变量时序与信息集逐项对应后使用。 | 可直接使用（一般方法） |
+| Q2-02 | V1 是固定 `K=8` 的既有签字结果。 | E | `output/result2.xlsx`：2025-02-01 至 12-31、334 日；`output/q2_full_k8_risk/`：2025 全年 365 日（含 1 月预热）；`docs/reviews/q2-final-delivery-audit.md`。 | — | 不证明 `K=8` 最优，不允许混用两种核算范围，也不证明 V2 已替代它。 | 结果句加 V1、明确 2–12 月或 1–12 月口径、输出和模型边界。 | 可直接使用（限定 V1） |
+| Q2-03 | V1 的“全路径情景补救近似 + MPC”是项目实现描述。 | A+E | 旧实现与既有审计材料；需按代码变量的信息可见性解释。 | Q2-L1 只能提供概念对照。 | 不支持称为严格多阶段随机规划。 | 保留“近似”，避免升级术语。 | 需改写 |
+| Q2-04 | 合同量 `q` 按合同规则支付，执行变量满足 `x<=q`。 | A | `docs/specs/q2-policy-consistent-redesign.md` 的候选合同语义。 | — | 不证明附件或现实合同必然采用该支付/履约规则。 | 写成 V2 建模假设；给出替代合同语义敏感性。 | 待队长确认语义 |
+| Q2-05 | V2 的日前层使用单一基准预测并保留风险备用。 | A+E | V2 规范与 C2-R2 审计输出。 | Q2-L1 可解释先验/补救的一般区分。 | 不证明该架构优于 V1 或是唯一政策一致架构。 | 写“候选架构”，等 C2-R3 全年结果后再比较。 | 候选可描述 |
+| Q2-06 | 滚动预测评估必须防止未来实际值泄漏。 | L | 因果预测与回测的一般规范。 | Q2-L2，pp.438–440，§2、§3.2。 | 不证明 V2 所有特征均无泄漏。 | 由 `policy_consistency_audit.json` 单独证明项目合规。 | 可直接使用（一般方法） |
+| Q2-07 | MPC 每次仅实施当前控制量，再以新状态滚动求解。 | L | 一般 receding-horizon 机制。 | Q2-L3，pp.1819–1820，§III-D，Eq.(17) 及 §III-E。 | 不支持 V2 的 10 min 步长、48 h 窗口或具体目标。 | 文献支撑机制，项目规范支撑参数。 | 可直接使用（一般方法） |
+| Q2-08 | 联合轨迹情景应保留预测时段间依赖。 | L | 情景方法的一般动机。 | Q2-L4，PDF p.5（正式 p.4）“Generating scenarios”；PDF p.7（正式 p.6）“Scenario generation”。 | 不证明负荷-PV 残差分布、`K=8` 或 28 日窗口已校准。 | 只写“一般上需保留依赖”；具体生成器由项目审计。 | 可直接使用（一般方法） |
+| Q2-09 | PAM/k-medoids 可用真实观测中的 medoid 表示簇。 | L | 聚类算法的一般性质。 | Q2-L5，Ch.2，pp.68–125。 | 不证明 `K=8` 最优、簇频率是真实概率或尾部风险充分。 | 将 `K` 写成预注册设计参数并补敏感性。 | 可直接使用（一般方法） |
+| Q2-10 | V2 每 14 日在此前 14 个已结束日上比较 `m1/m2/m3 × alpha∈{.60,.70,.80,.90}` 的 12 个候选组合。 | A+E | 候选和窗口定义见 V2 规范；全部受评分校准块的比较记录见 `output/q2_policy_consistent/validation.md`。 | — | 不支持全年闭环优于 V1；也不支持候选、14 日窗口或入选参数普适最优。 | 写“在该候选集与闭环校准协议下比较/入选”，报告选择频率。 | 可直接使用（限定 C2-R2） |
+| Q2-11 | V2 的校准和执行审计排除了未来实际值。 | E | `output/q2_policy_consistent/policy_consistency_audit.json`：校准/执行 future actuals exclusion 为 true。 | Q2-L2 只提供一般原则。 | 不支持预测器具有外部数据集泛化能力。 | 附输出版本和审计字段；不写“完全无泄漏”超出已检项目。 | 可直接使用（限定审计项） |
+| Q2-12 | V2 已完成全年正式运行并可导出新 `result2.xlsx`。 | E | 同一审计明确 `annual_run=false`、`candidate_result2_xlsx=false`。 | — | 现有证据直接否定该写法。 | 删除；等待 C2-R3 全年台账、K 与初始 SOC 敏感性。 | 禁止使用 |
+| Q2-13 | 终端约束或未来价值项可用于减弱有限时域末端放空偏差。 | L+A | 一般末端效应为 L；Q2 的 48 小时结构、价值切面与跨日 SOC 是项目选择/审计。 | Q2-L6，正式 PDF pp.19–20 §3.3.2、p.34 §4.3.1。 | 不支持 48 小时是最优长度、具体价值函数准确，也不支持把 Q2 数值搬给 Q3。 | 一般作用引文与 Q2 数值审计分开；报告有/无价值项、边界和初始 SOC 敏感性。 | 需限定使用 |
+
+## 3. 外部来源卡片
+
+### Q2-L1 两阶段随机规划
+
+- 作者/机构：Alexander Shapiro，Darinka Dentcheva，Andrzej Ruszczyński。
+- 题名与年份：*Lectures on Stochastic Programming: Modeling and Theory*，第 3 版，2021。
+- DOI/稳定链接：<https://doi.org/10.1137/1.9781611976595>。
+- 精确定位：Chapter 2 “Two-stage problems”，先验决策、随机量实现与 recourse 的定义和标准形式。
+- 可支撑的准确句子：“两阶段随机规划把随机信息揭示前的决策与揭示后按情景采取的补救决策分开。”
+- 不能支撑：V1/V2 自动构成严格两阶段或多阶段模型、本项目合同语义、场景数、风险权重或效果。
+- GB/T 7714：SHAPIRO A, DENTCHEVA D, RUSZCZYŃSKI A. Lectures on stochastic programming: modeling and theory[M]. 3rd ed. Philadelphia: Society for Industrial and Applied Mathematics, 2021. DOI:10.1137/1.9781611976595.
+
+### Q2-L2 因果回测与滚动起点
+
+- 作者/机构：Leonard J. Tashman。
+- 题名与年份：*Out-of-Sample Tests of Forecasting Accuracy: An Analysis and Review*，2000。
+- DOI/稳定链接：<https://doi.org/10.1016/S0169-2070(00)00065-0>。
+- 精确定位：pp.438–439，§2 “Testing forecast accuracy”；pp.439–440，§3.2 “Rolling origin”。
+- 可支撑的准确句子：“样本外评价应隔离保留样本以避免窥视污染；滚动起点评价随时间移动预测起点并只利用当时可得信息。”
+- 不能支撑：V2 的特征、14 日校准窗、候选集合或预测精度已经合理。
+- GB/T 7714：TASHMAN L J. Out-of-sample tests of forecasting accuracy: an analysis and review[J]. International Journal of Forecasting, 2000, 16(4): 437-450. DOI:10.1016/S0169-2070(00)00065-0.
+
+### Q2-L3 滚动时域控制
+
+- 作者/机构：Alessandra Parisio，Evangelos Rikos，Luigi Glielmo。
+- 题名与年份：*A Model Predictive Control Approach to Microgrid Operation Optimization*，2014。
+- DOI/稳定链接：<https://doi.org/10.1109/TCST.2013.2295737>。
+- 精确定位：pp.1819–1820，§III-D，Eq.(17) 后的 receding-horizon 描述；§III-E 的当前状态初始化。
+- 可支撑的准确句子：“MPC 在每个时刻求解有限时域问题，仅应用首个控制动作，再以更新后的状态移动时域并重新求解。”
+- 不能支撑：Q2 的具体更新频率、预测长度、损失函数、指数权重或候选模型优越性。
+- GB/T 7714：PARISIO A, RIKOS E, GLIELMO L. A model predictive control approach to microgrid operation optimization[J]. IEEE Transactions on Control Systems Technology, 2014, 22(5): 1813-1827. DOI:10.1109/TCST.2013.2295737.
+
+### Q2-L4 时序相关的联合轨迹情景
+
+- 作者/机构：Pierre Pinson，Henrik Madsen，Henrik Aalborg Nielsen，等。
+- 题名与年份：*From Probabilistic Forecasts to Statistical Scenarios of Short-Term Wind Power Production*，2009。
+- DOI/稳定链接：<https://doi.org/10.1002/we.284>；作者存档 <https://orbit.dtu.dk/files/4900902/pinsonetal_wpfscenarios_fin.pdf>。
+- 精确定位：PDF p.5（正式 p.4）“Generating scenarios of wind power production”；PDF p.7（正式 p.6）“Scenario generation”，Eq.(11)–(12)。
+- 可支撑的准确句子：“面向决策的完整预测轨迹应刻画多个预测时段之间的依赖，统计情景可由联合随机结构生成。”
+- 不能支撑：本项目负荷-PV 残差满足同一分布、经验路径/聚类是唯一方案、`K=8` 或窗口长度最优。
+- GB/T 7714：PINSON P, MADSEN H, NIELSEN H A, et al. From probabilistic forecasts to statistical scenarios of short-term wind power production[J]. Wind Energy, 2009, 12(1): 51-62. DOI:10.1002/we.284.
+
+### Q2-L5 k-medoids / PAM
+
+- 作者/机构：Leonard Kaufman，Peter J. Rousseeuw。
+- 题名与年份：*Partitioning Around Medoids (Program PAM)*，1990。
+- DOI/稳定链接：<https://doi.org/10.1002/9780470316801.ch2>。
+- 精确定位：Chapter 2，pp.68–125，medoid 与 PAM 的定义及算法。
+- 可支撑的准确句子：“PAM 以样本中的代表对象作为 medoid 来表征各簇。”
+- 不能支撑：`K=8` 是最优场景数、簇频率等于真实概率、极端场景得到充分覆盖或项目效果。
+- GB/T 7714：KAUFMAN L, ROUSSEEUW P J. Partitioning around medoids (program PAM)[M]//Finding groups in data: an introduction to cluster analysis. Hoboken: John Wiley & Sons, 1990: 68-125. DOI:10.1002/9780470316801.ch2.
+
+### Q2-L6 有限时域末端效应
+
+- 作者/机构：Karl-Kiên Cao，Katharina von Krbek，Manuel Wetzel，等。
+- 题名与年份：*Classification and Evaluation of Concepts for Improving the Performance of Applied Energy System Optimization Models*，2019。
+- DOI/稳定链接：<https://doi.org/10.3390/en12244656>。
+- 精确定位：正式 PDF pp.19–20，§3.3.2；p.34，§4.3.1 “Discharge Effect”。
+- 可支撑的准确句子：“有限或滚动时域若忽略储能循环/终端平衡，可能在时域末端人为放空储能；终端条件或跨期处理用于控制这类偏差。”
+- 不能支撑：Q2 的 48 小时长度、价值切面数值、跨日边界或成本改善，也不能替代 Q3 的专属标定与审计。
+- GB/T 7714：CAO K K, VON KRBEK K, WETZEL M, et al. Classification and evaluation of concepts for improving the performance of applied energy system optimization models[J]. Energies, 2019, 12(24): 4656. DOI:10.3390/en12244656.
+
+## 4. A 类假设、局限与敏感性闭环
+
+| A 类事项 | 假设 | 主要局限 | 必需处理 |
 |---|---|---|---|
-| 每日 0:00 先确定 144 时段正常购电计划，实际不足再紧急补购 | `docs/specs/q2.md`；`q2/optimization.py`；`q2/pilot.py` | Birge & Louveaux (2011), pp.181–263；Shapiro et al. (2021), Ch.2 | 用“两阶段、先验决策—事后补救”解释。5 倍价格是题给事实，不需外部文献。 |
-| 各场景共享日前计划 `q_t`，场景内才有 `x,e,c,d,w,E` | `q2/optimization.py`；`docs/specs/q2.md` | Birge & Louveaux (2011)；Shapiro et al. (2021) | 共享 `q`体现非预见性；不得给每个场景各自重选计划。 |
-| 日前计划支付 `p_t q_t`，实际使用 `x_t≤q_t`，未用额度为沉没成本 | `docs/specs/q2.md`；`q2/optimization.py`；`q2/pilot.py` | 主要为题意映射，无直接外部来源 | 这是本项目对“计划购电”的可执行解释，不应称为普遍市场规则。 |
-| 紧急购电只补当前短缺，不能借未来计划额度 | `q2/pilot.py`；`docs/reviews/q2-final-delivery-audit.md` | 主要为项目决策 | 若允许跨时段挪用，信息结构和成本含义会改变。 |
-| 负荷预测最多取最近 4 个同星期日，PV 预测取最近 7 天 | `q2/forecast.py`；`output/q2_full_k8_risk/forecast_audit.md` | Hong & Fan (2016)；Antonanzas et al. (2016)；Sengupta et al. (2024) | 外部文献支持负荷/PV 预测的必要性和日历/历史信息使用；具体 4/7 窗口是项目经验选择。 |
-| 预测严格只用目标日 0:00 前历史 | `q2/forecast.py`；`forecast_audit.md`；相关测试 | Tashman (2000) | 可称为 rolling-origin/逐日起点回测；不得把当日实测曲线输入日前模型。 |
-| 用历史联合负荷–PV 残差轨迹构造场景，保留时序及二者相关性 | `q2/scenarios.py`；`q2/pilot.py` | Pinson et al. (2009)；Dupačová et al. (2003) | 引用支持“轨迹情景”和“场景缩减”原则；不证明本残差分布完全校准。 |
-| 场景距离按价格加权，并用 MAD 尺度标准化 | `q2/scenarios.py` | Rousseeuw & Croux (1993) | MAD 支持稳健尺度；价格权重是问题导向的本文设计，不是该统计文献的结论。 |
-| 用 PAM/k-medoids 从真实历史轨迹中选 8 个代表场景，概率为簇占比 | `q2/scenarios.py`；`output/q2_pilot/scenario_selection.csv` | Kaufman & Rousseeuw (1990), Ch.2；Dupačová et al. (2003) | medoid 是实际样本代表；`K=8` 来自本项目旧动态 K 审计后的固定选择，不是文献定理。 |
-| 高价权重下最大正净残差日作为压力日，但默认不加入期望 | `q2/scenarios.py`；`docs/specs/q2.md` | 无直接外部来源 | 这是经验压力测试；若未被 PAM 选中，不得修改场景概率或目标函数。 |
+| 合同语义 | `q` 按合同规则支付，`x<=q` | 附件若是按实际交付或偏差结算，目标与最优策略会变化 | 队长确认主解释；至少比较替代合同语义 |
+| 场景数 | 固定 `K=8` | 尾部覆盖和计算量的折中未经普适证明 | C2-R3 报 K 敏感性；此前只称设计参数 |
+| 基准预测器 | `m1` 的负荷取最近至多 4 个同星期日，PV 取最近至多 7 日；`m2/m3` 为有限候选 | 结构与回退规则可能受季节/预热期影响 | 报负荷、PV、净负荷诊断和闭环成本；FIN 自适应预测器只作为同政策候选 |
+| 残差池 | 最近至多 28 个完整历史日，PAM 压缩为 K=8 | 28 日、距离与簇频率都是估计选择，簇占比不是真实概率 | 比较替代窗口、K=4/8/12 与必要的等权情景；报告尾部覆盖 |
+| 校准与风险分位 | 每 14 日用此前 14 个已结束日比较 `alpha∈{.60,.70,.80,.90}` | 候选集合和重选频率可能受非平稳性影响 | 报各 alpha 的选择频率、覆盖率和实现成本；不写行业最优 |
+| 计算预算 | 若正文沿用 `T_max=0.20 s` | 这是团队计算预算，不是电力系统要求 | 报硬件/求解器/超时频率，并做预算敏感性或仅列实现限制 |
+| 终端/初始 SOC | 每个时域按规范施加边界 | 可能带来起止时段偏差 | 完成 2 月初 SOC 与终端规则敏感性 |
+| 近似时序 | V1/V2 对信息阶段作项目化简 | 不等同严格多阶段随机控制 | 方法名称保留“近似/候选”，列明每类变量可见信息 |
 
-## 风险控制、滚动执行与终端价值
+## 5. E 类结果写作模板
 
-| 可写主张 | 项目内直接证据 | 外部依据 | 建议措辞与边界 |
-|---|---|---|---|
-| 从 1 月 29 日起固定 `K=8`，此前样本不足用 `K=1` 且不设储备 | `q2/run_q2_k8_risk.py`；`output/q2_full_k8_risk/risk_calibration.csv` | 无需外部来源 | 属于本项目样本可用性与正式口径。 |
-| 每 14 天用已结束日期在 `α∈{0.60,0.70,0.80,0.90}` 中重新选风险分位 | `q2/run_q2_k8_risk.py`；`q2/pilot.py`；`risk_calibration.csv` | Hong & Fan (2016)；Matos & Bessa (2011) | 外部文献支持用概率/分位信息制定储备；候选集合、14 天频率和选择准则均是项目设计。 |
-| 当前方案是经验加权分位下限，不是 CVaR | `docs/specs/q2.md`；`q2/optimization.py` | Rockafellar & Uryasev (2000) 仅作反例/扩展 | 正文应叫“风险分位储备/计划下限”；不能称 CVaR 优化。 |
-| 实际运行按已观测残差前缀更新场景权重，并重求余下时段，只执行第一步 | `q2/pilot.py` | Parisio et al. (2014a, 2014b)；Silvente et al. (2018) | 文献支持滚动 MPC/周期更新；本项目的指数前缀距离权重是自定义经验更新，不应宣称严格贝叶斯后验。 |
-| SOC 全年连续，只在 1 月 1 日注入一次 6000 kWh | `q2/pilot.py`；`output/q2_full_k8_risk/daily_summary.csv`；validation | La Tona et al. (2021)；Luo et al. (2019) | 跨日状态连续；不能每天重置或照搬 Q1 的日末相等约束。 |
-| 48 h 下一日 cost-to-go 缓解有限视界末端效应 | `q2/pilot.py`；`next_day_value_audit.csv` | Cao et al. (2019)；Luo et al. (2019)；Silvente et al. (2018) | 文献支持末端效应与滚动衔接；具体 48 h 是项目选择。 |
-| 价值函数以初始 SOC 的对偶斜率生成支持割，并用 chord-vs-cut 间隙验证 | `q2/pilot.py`；`next_day_value_audit.csv`；validation | Boyd & Vandenberghe (2004), §5.6；Benders (1962)；Pereira & Pinto (1991) | 支持割/对偶斜率是分解与动态规划思想；本项目 `≤1 元`阈值是数值验收标准。 |
-| 下一日价值只影响当前决策，不并入实际账单 | `q2/pilot.py`；`validation.json` | Birge & Louveaux (2011), value-function/recourse chapters | 账单只含正常计划费与紧急购电费；不要把 terminal value 重复计费。 |
+- V1：`在 V1（固定 K=8、既有签字口径）的附件样本和模型边界下，output/result2.xlsx 与 output/q2_full_k8_risk/ 给出……；该结果不外推至其他年份或合同语义。`
+- V2：`在 C2-R2 候选验证中，output/q2_policy_consistent/ 记录了校准/执行的因果一致性检查；该阶段未完成正式全年运行，也未生成候选 result2.xlsx。`
+- 禁止把 V1 数值与 V2 方法名拼成同一条结果句；禁止把 `deployed_days=365` 解释为 C2-R3 正式全年闭环运行。
 
-## 物理边界与结果
+## 6. FIN 签字意见
 
-| 可写主张 | 项目内直接证据 | 外部依据 | 建议措辞与边界 |
-|---|---|---|---|
-| 电池效率、SOC、功率和平衡沿用 Q1 公共母线侧口径 | `q2/config.py`；`q2/optimization.py`；`q2/pilot.py` | Bašić et al. (2023)；Pinto et al. (2022)；SAM Help | 具体数值仍来自题面。 |
-| 不售电，未消纳 PV 可弃 | `docs/specs/q2.md`；`q2/optimization.py` | Jorgenson et al. (2020)；Case et al. (2018) | 不售电是本文边界，不是文献或题面明确市场规则。 |
-| 2–12 月正式总费用约 1445.667 万元，其中计划费 1252.909 万元、应急费 192.758 万元 | `output/q2_full_k8_risk/validation.json`；`daily_summary.csv`；`output/result2.xlsx` | 无需外部来源 | 数字必须以固定 K8 文件为准。 |
-| 2–12 月计划量约 2031.857 万 kWh、实用计划量约 1934.691 万 kWh、未用约 97.166 万 kWh、应急约 53.449 万 kWh | 同上 | 无需外部来源 | 计划量≠实际使用量；费用按购买的 `q` 计算。 |
-| 2–12 月弃光约 134.949 万 kWh，应急购电发生在 293/334 天 | `daily_summary.csv`；`validation.json` | Jorgenson et al. (2020) 仅解释弃光 | 发生频率是回测结果，不等同系统失供概率。 |
-| 最大应急日为 2025-06-01，应急约 14274.48 kWh、费用约 48353.36 元 | `daily_summary.csv`；`results_summary.md` | 无需外部来源 | 可作压力案例，但不能凭单日归因；需结合当日残差、价格、SOC 和计划检查。 |
-| 全年正式总费用约 1634.094 万元，平衡残差、跨日 SOC、`x≤q` 和同时充放均通过审计 | `output/q2_full_k8_risk/validation.json`；`results_summary.md` | 无需外部来源 | “通过数值审计”不是现实可实施性的完整证明，仍受市场/PCC/电池退化简化限制。 |
-| 固定 K8 相对旧动态 K 的 2–12 月费用降低约 5.017 万元（0.35%） | `results_summary.md`；`output/q2_full_linked/comparison.json`；K8 validation | 无需外部来源 | 必须注明动态 K 是旧比较器而非最终方案；差额来自计划费与应急费的共同变化。 |
-
-## 论文段落的推荐引用组合
-
-- **两阶段信息结构**：Birge & Louveaux + Shapiro et al.，同时引用 `docs/specs/q2.md` 说明本题 `q,x,e` 定义。
-- **预测与无泄漏回测**：Hong & Fan + Antonanzas et al. + Tashman。
-- **联合残差与场景缩减**：Pinson et al. + Dupačová et al. + Kaufman & Rousseeuw；MAD 再加 Rousseeuw & Croux。
-- **风险分位**：Hong & Fan + Matos & Bessa；明确不使用 CVaR。
-- **滚动执行**：Silvente et al. + Parisio et al.。
-- **跨日 SOC/终端价值**：La Tona et al. + Luo et al. + Cao et al.；对偶支持割再加 Boyd、Benders、Pereira & Pinto。
-- **弃光边界**：Jorgenson et al. + Case et al.。
-
-## 可直接使用的精炼论证
-
-> Q2 将正常购电与紧急补购按信息到达时点分开：日初在未知当天真实负荷与光伏的条件下确定所有场景共享的计划量，场景实现后再通过储能、弃光和紧急购电补救。这一结构对应两阶段随机规划中的先验决策与情景相关补救，并以非预见性约束阻止模型利用未来信息。
-
-> 负荷和光伏分别由截至目标日 0:00 的历史生成基准预测，再从历史联合残差轨迹中抽取真实 medoid 场景，以保留日内相关性。PAM、MAD 与场景缩减文献支持代表轨迹选择和稳健尺度处理，但 `K=8`、价格加权距离、窗口长度及前缀权重更新均是本项目经回测确定的设计，不是文献规定。
-
-> 实际运行采用滚动时域：每获得新的真实观测便更新场景可信度，重求剩余时段并只执行首步。SOC 跨日连续；窗口末端通过下一日 cost-to-go 保留未来储能价值。该价值函数影响控制决策但不进入实际购电账单，从而避免把算法内部终端价值与真实费用重复相加。
+V1 仍是当前正式 Q2 结果，V2 仅是通过 C2-R2 检查的候选重构。文献只支撑两阶段、滚动起点、MPC、相关轨迹和 medoid 的一般方法，不支撑本项目合同语义、参数最优性或性能。C2-R3 全年台账、K 敏感性、2 月初 SOC 敏感性及候选工作簿未完成前，不得用 V2 替换 V1。
