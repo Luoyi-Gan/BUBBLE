@@ -1,0 +1,24 @@
+\begin{table}[htbp]
+\centering
+\caption{关键稳健性证据汇总（均为已有试验结果）}
+\label{tab:robustness-evidence}
+\begingroup
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.28}
+\begin{tabularx}{0.98\linewidth}{@{}C{1.0cm}C{3.1cm}YY@{}}
+\toprule
+问题 & 核验设置 & 已有结果 & 支持的结论 \\
+\midrule
+Q1 & 容量与功率上限分别变动 $\pm10\%$
+& 容量变动后成本为 $34547.91/33092.98$ 元；功率变动后为 $33827.76/33780.88$ 元
+& 同幅度变化下，容量对成本的影响大于充放电功率上限 \\
+Q3 & 年末 SOC 由 $1200$ 调整为 $6000\,\mathrm{kWh}$
+& 主策略成本增加 $2262.88$ 元，五种策略的相对排序保持不变
+& 后续预报调整的优势不依赖于年末耗尽储能 \\
+Q4 & 在同一闭环协议下比较 $K=8$ 与 $K=12$
+& $K=8$ 成本高 $39308.25$ 元（$0.24\%$），平均耗时由 $6.7$ s 降至 $5.6$ s，约缩短 $16.3\%$
+& 在既定 $1\%$ 成本容差内，$K=8$ 以较小成本差换取更快求解 \\
+\bottomrule
+\end{tabularx}
+\endgroup
+\end{table}

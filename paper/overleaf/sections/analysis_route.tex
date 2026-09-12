@@ -1,0 +1,33 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[
+  stage/.style={draw=black, rounded corners=1.5pt, align=center,
+    text width=2.62cm, minimum height=1.38cm, inner sep=4pt, font=\small},
+  flow/.style={-{Stealth[length=2.2mm]}, line width=0.55pt},
+  audit/.style={draw=black, align=center, text width=14.5cm,
+    minimum height=0.82cm, inner sep=4pt, font=\small}
+]
+\node[stage] (data) {数据与硬约束\\负荷、光伏、电价\\SOC、功率、能量平衡};
+\node[stage, right=0.34cm of data] (q1) {Q1 确定性基准\\日前购电与储能\\线性规划};
+\node[stage, right=0.34cm of q1] (q2) {Q2 日前锁定\\风险储备与\\因果 MPC};
+\node[stage, right=0.34cm of q2] (q3) {Q3 预报更新\\承诺调整与\\信息价值触发};
+\node[stage, right=0.34cm of q3] (q4) {Q4 价格扩展\\联合残差与\\波动价结算};
+
+\draw[flow] (data) -- (q1);
+\draw[flow] (q1) -- (q2);
+\draw[flow] (q2) -- (q3);
+\draw[flow] (q3) -- (q4);
+
+\node[audit, below=0.95cm of q2] (checks)
+{贯穿四问的工程闭环：物理审计（能量平衡、SOC、功率）\quad
+信息集审计（只使用决策时点前可得信息）\quad
+成本台账（计划、调整、紧急购电逐项回算）};
+\foreach \n in {q1,q2,q3,q4}{
+  \draw[-{Stealth[length=1.8mm]}, dashed, line width=0.45pt]
+    (\n.south) -- (\n.south |- checks.north);
+}
+\end{tikzpicture}
+\caption{四个问题的递进建模路线与统一工程闭环}
+\label{fig:research-route}
+\end{figure}
+\FloatBarrier
