@@ -1,0 +1,8 @@
+{
+  "all_pass": true,
+  "failures": [],
+  "n_daily_rows": 3650,
+  "git_commit": "233d13f7270525574c784129bf594793f3193787",
+  "load_treatment": "causal_load_main",
+  "chooses_year_end_boundary": false
+}
