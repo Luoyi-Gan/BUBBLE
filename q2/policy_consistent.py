@@ -10,8 +10,10 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 from math import sqrt
+import json
 import os
 from pathlib import Path
+from threading import Lock
 
 import numpy as np
 import pandas as pd
@@ -27,6 +29,7 @@ from q2.config import (
     NEXT_DAY_VALUE_GAP_TOL_YUAN,
     NEXT_DAY_VALUE_MAX_SAMPLES,
     NUMERIC_TOL,
+    OFFICIAL_OUTPUT_START,
     POWER_LIMIT_KWH,
     PV_HISTORY_DAYS,
     RISK_ALPHA_CANDIDATES,
@@ -64,6 +67,28 @@ FORECAST_MODES: tuple[ForecastMode, ...] = (
 )
 R1_DEFAULT_MODE = ForecastMode.M1
 R1_DEFAULT_ALPHA = 0.60
+ValueCutCache = dict[
+    tuple[int, str, float | None, int],
+    tuple[tuple[ValueCut, ...], list[dict]],
+]
+PERIOD_JANUARY_WARMUP = "january_warmup"
+PERIOD_FEB_DEC_OUTPUT = "feb_dec_output"
+
+
+@dataclass(frozen=True)
+class FrozenDayPolicy:
+    date: str
+    forecast_mode: ForecastMode
+    risk_alpha: float | None
+    fallback_reason: str
+    calibration_date: str
+    effective_start_date: str
+    effective_end_date: str
+
+    def effective_k(self, requested_k: int) -> int:
+        if self.risk_alpha is None:
+            return 1
+        return int(requested_k)
 
 
 @dataclass(frozen=True)
@@ -626,6 +651,51 @@ def one_se_tiebreak(
     )
 
 
+def value_cut_cache_key(
+    day_index: int,
+    mode: ForecastMode,
+    risk_alpha: float | None,
+    k: int,
+) -> tuple[int, str, float | None, int]:
+    return (int(day_index), mode.value, None if risk_alpha is None else float(risk_alpha), int(k))
+
+
+def cached_baseline_value_cuts(
+    cache: ValueCutCache,
+    data: Q2Data,
+    archive: ForecastArchive,
+    day_index: int,
+    mode: ForecastMode,
+    k: int,
+    risk_alpha: float | None,
+    lock: Lock | None = None,
+) -> tuple[tuple[ValueCut, ...], list[dict]]:
+    """Reuse next-day baseline value cuts for the same (day, m, α, K)."""
+    key = value_cut_cache_key(day_index, mode, risk_alpha, k)
+    if lock is None:
+        hit = cache.get(key)
+        if hit is not None:
+            return hit
+        built = build_baseline_value_cuts(
+            data, archive, day_index, mode, k=k, risk_alpha=risk_alpha
+        )
+        cache[key] = built
+        return built
+    with lock:
+        hit = cache.get(key)
+        if hit is not None:
+            return hit
+    built = build_baseline_value_cuts(
+        data, archive, day_index, mode, k=k, risk_alpha=risk_alpha
+    )
+    with lock:
+        existing = cache.get(key)
+        if existing is not None:
+            return existing
+        cache[key] = built
+        return built
+
+
 def score_one_candidate(
     data: Q2Data,
     archive: ForecastArchive,
@@ -634,6 +704,9 @@ def score_one_candidate(
     validation_indices: tuple[int, ...],
     window_start_soc: float,
     k: int = FIXED_SCENARIO_K,
+    include_value_cuts: bool = True,
+    cut_cache: ValueCutCache | None = None,
+    cut_cache_lock: Lock | None = None,
 ) -> dict:
     """Run one (m, alpha) on a finished-day window with that candidate's own SOC path."""
     mode = ForecastMode(mode_value)
@@ -646,7 +719,20 @@ def score_one_candidate(
     soc = float(window_start_soc)
     used_full_day_actual_lp = False
     future_actuals_in_optimizer = False
+    cache = {} if cut_cache is None else cut_cache
     for i in validation_indices:
+        cuts: tuple[ValueCut, ...] | None = None
+        if include_value_cuts:
+            cuts, _cut_rows = cached_baseline_value_cuts(
+                cache,
+                data,
+                archive,
+                int(i),
+                mode,
+                k,
+                float(alpha),
+                lock=cut_cache_lock,
+            )
         summary, _frame, _plan, _floor, _scenarios = plan_closed_loop_day(
             data,
             archive,
@@ -655,7 +741,7 @@ def score_one_candidate(
             mode=mode,
             risk_alpha=float(alpha),
             k=k,
-            terminal_value_cuts=None,
+            terminal_value_cuts=cuts,
         )
         used_full_day_actual_lp = used_full_day_actual_lp or bool(
             summary["used_full_day_actual_lp"]
@@ -688,6 +774,7 @@ def score_one_candidate(
         "used_full_day_actual_lp": used_full_day_actual_lp,
         "future_actuals_in_optimizer": future_actuals_in_optimizer,
         "selection_criterion": "mean_actual_cost_sum_pq_plus_5pe",
+        "include_value_cuts": bool(include_value_cuts),
     }
 
 
@@ -700,6 +787,9 @@ def _score_candidate_job(payload: dict) -> dict:
         payload["validation_indices"],
         payload["window_start_soc"],
         payload["k"],
+        include_value_cuts=payload.get("include_value_cuts", True),
+        cut_cache=payload.get("cut_cache"),
+        cut_cache_lock=payload.get("cut_cache_lock"),
     )
 
 
@@ -710,9 +800,13 @@ def closed_loop_candidate_window(
     window_start_soc: float,
     k: int = FIXED_SCENARIO_K,
     workers: int | None = None,
+    include_value_cuts: bool = True,
+    cut_cache: ValueCutCache | None = None,
+    cut_cache_lock: Lock | None = None,
 ) -> list[dict]:
     """Score all 12 (m, alpha) pairs by the same residual-MPC policy."""
     indices = tuple(int(i) for i in np.asarray(validation_indices).ravel())
+    cache = {} if cut_cache is None else cut_cache
     jobs = [
         {
             "data": data,
@@ -722,6 +816,9 @@ def closed_loop_candidate_window(
             "validation_indices": indices,
             "window_start_soc": float(window_start_soc),
             "k": k,
+            "include_value_cuts": include_value_cuts,
+            "cut_cache": cache,
+            "cut_cache_lock": cut_cache_lock,
         }
         for mode in FORECAST_MODES
         for alpha in RISK_ALPHA_CANDIDATES
@@ -780,7 +877,8 @@ def run_rolling_closed_loop_calibration(
     archives: dict[ForecastMode, ForecastArchive],
     k: int = FIXED_SCENARIO_K,
     workers: int | None = None,
-) -> tuple[list[dict], list[dict], list[dict]]:
+    include_value_cuts: bool = True,
+) -> tuple[list[dict], list[dict], list[dict], dict]:
     """Walk 14-day blocks, score 12 candidates, then deploy the winner to carry SOC."""
     n = len(data.dates)
     policy_start_soc = np.full(n, np.nan)
@@ -790,6 +888,8 @@ def run_rolling_closed_loop_calibration(
     deployed_rows: list[dict] = []
     block = K_RECALIBRATION_DAYS
     window = RISK_CALIBRATION_DAYS
+    cut_cache: ValueCutCache = {}
+    cut_lock = Lock()
 
     for calibration in range(0, n, block):
         effective_end = min(calibration + block - 1, n - 1)
@@ -832,6 +932,7 @@ def run_rolling_closed_loop_calibration(
                     "one_se_threshold_yuan": float("nan"),
                     "selected": True,
                     "fallback_reason": fallback,
+                    "include_value_cuts": bool(include_value_cuts),
                 }
             )
             active_k = 1
@@ -846,6 +947,9 @@ def run_rolling_closed_loop_calibration(
                 window_start_soc,
                 k=k,
                 workers=workers,
+                include_value_cuts=include_value_cuts,
+                cut_cache=cut_cache,
+                cut_cache_lock=cut_lock,
             )
             mae_by_mode = _validation_diagnostics(data, archives, validation, k=k)
             selected_row = next(row for row in records if row["selected"])
@@ -894,6 +998,18 @@ def run_rolling_closed_loop_calibration(
 
         for i in range(calibration, effective_end + 1):
             policy_start_soc[i] = soc
+            cuts: tuple[ValueCut, ...] | None = None
+            if include_value_cuts:
+                cuts, _cut_rows = cached_baseline_value_cuts(
+                    cut_cache,
+                    data,
+                    archives[selected_mode],
+                    i,
+                    selected_mode,
+                    active_k,
+                    selected_alpha,
+                    lock=cut_lock,
+                )
             summary, _frame, _plan, _floor, _scenarios = plan_closed_loop_day(
                 data,
                 archives[selected_mode],
@@ -902,7 +1018,7 @@ def run_rolling_closed_loop_calibration(
                 mode=selected_mode,
                 risk_alpha=selected_alpha,
                 k=active_k,
-                terminal_value_cuts=None,
+                terminal_value_cuts=cuts,
             )
             if not summary["pass"]:
                 raise AssertionError(f"deployed policy failed on {summary['date']}")
@@ -923,7 +1039,245 @@ def run_rolling_closed_loop_calibration(
                     "future_actuals_in_optimizer": summary["future_actuals_in_optimizer"],
                     "pass": summary["pass"],
                     "fallback_reason": fallback,
+                    "include_value_cuts": bool(include_value_cuts),
                 }
             )
             soc = float(summary["soc_end_kwh"])
-    return calibration_rows, diagnostic_rows, deployed_rows
+    return (
+        calibration_rows,
+        diagnostic_rows,
+        deployed_rows,
+        {
+            "include_value_cuts": bool(include_value_cuts),
+            "calibration_include_value_cuts": bool(include_value_cuts),
+            "deployment_include_value_cuts": bool(include_value_cuts),
+            "value_cut_cache_entries": int(len(cut_cache)),
+        },
+    )
+
+
+def output_period(date: pd.Timestamp | str) -> str:
+    stamp = pd.Timestamp(date).normalize()
+    if stamp < pd.Timestamp(OFFICIAL_OUTPUT_START):
+        return PERIOD_JANUARY_WARMUP
+    return PERIOD_FEB_DEC_OUTPUT
+
+
+def selected_calendar_for_dates(
+    calibration: pd.DataFrame,
+    dates: pd.DatetimeIndex,
+) -> list[FrozenDayPolicy]:
+    """Map each calendar day to the unique R2-selected (m, α) block."""
+    selected = calibration.loc[calibration["selected"].astype(bool)].copy()
+    if selected.empty:
+        raise AssertionError("closed-loop calibration has no selected rows")
+    selected["effective_start_date"] = pd.to_datetime(selected["effective_start_date"])
+    selected["effective_end_date"] = pd.to_datetime(selected["effective_end_date"])
+    policies: list[FrozenDayPolicy] = []
+    for date in pd.DatetimeIndex(dates):
+        match = selected.loc[
+            (selected["effective_start_date"] <= date)
+            & (selected["effective_end_date"] >= date)
+        ]
+        if len(match) != 1:
+            raise AssertionError(f"expected one selected block for {date.date()}, got {len(match)}")
+        row = match.iloc[0]
+        alpha_raw = row["risk_alpha"]
+        alpha = None if pd.isna(alpha_raw) else float(alpha_raw)
+        policies.append(
+            FrozenDayPolicy(
+                date=date.strftime("%Y-%m-%d"),
+                forecast_mode=ForecastMode(str(row["forecast_mode"])),
+                risk_alpha=alpha,
+                fallback_reason=str(row["fallback_reason"] or ""),
+                calibration_date=pd.Timestamp(row["calibration_date"]).strftime("%Y-%m-%d"),
+                effective_start_date=pd.Timestamp(row["effective_start_date"]).strftime(
+                    "%Y-%m-%d"
+                ),
+                effective_end_date=pd.Timestamp(row["effective_end_date"]).strftime("%Y-%m-%d"),
+            )
+        )
+    return policies
+
+
+def _forecast_audit_row(summary: dict) -> dict:
+    return {
+        "date": summary["date"],
+        "forecast_mode": summary["forecast_mode"],
+        "risk_alpha": summary["risk_alpha"],
+        "scenario_k": summary["scenario_k"],
+        "load_source_dates": summary["load_source_dates"],
+        "pv_source_dates": summary["pv_source_dates"],
+        "residual_pool_end_date": summary["residual_pool_end_date"],
+        "medoid_dates": summary["medoid_dates"],
+        "load_fallback": summary["load_fallback"],
+        "pv_fallback": summary["pv_fallback"],
+        "risk_q_floor_kwh": summary["risk_q_floor_kwh"],
+        "has_scenario_specific_battery": summary["has_scenario_specific_battery"],
+        "day_ahead_variable_shapes": json.dumps(
+            summary["day_ahead_variable_shapes"], ensure_ascii=False
+        )
+        if not isinstance(summary["day_ahead_variable_shapes"], str)
+        else summary["day_ahead_variable_shapes"],
+    }
+
+
+def _physical_audit_row(summary: dict) -> dict:
+    return {
+        "date": summary["date"],
+        "period": summary["period"],
+        "pass": summary["pass"],
+        "planned_q_sha256": summary["planned_q_sha256"],
+        "max_balance_residual_kwh": summary["max_balance_residual_kwh"],
+        "max_x_minus_q_kwh": summary["max_x_minus_q_kwh"],
+        "max_simultaneous_cd_kwh2": summary["max_simultaneous_cd_kwh2"],
+        "soc_start_kwh": summary["soc_start_kwh"],
+        "soc_end_kwh": summary["soc_end_kwh"],
+        "unused_plan_kwh": summary["unused_plan_kwh"],
+        "emergency_kwh": summary["emergency_kwh"],
+        "curtailment_kwh": summary["curtailment_kwh"],
+        "used_full_day_actual_lp": summary["used_full_day_actual_lp"],
+        "future_actuals_in_optimizer": summary["future_actuals_in_optimizer"],
+    }
+
+
+def _daily_summary_row(summary: dict) -> dict:
+    shapes = summary["day_ahead_variable_shapes"]
+    if isinstance(shapes, dict):
+        shapes = json.dumps(shapes, ensure_ascii=False)
+    row = {key: value for key, value in summary.items() if key != "day_ahead_variable_shapes"}
+    row["day_ahead_variable_shapes"] = shapes
+    return row
+
+
+def aggregate_cost_row(
+    frame: pd.DataFrame,
+    *,
+    label: str,
+    extra: dict | None = None,
+) -> dict:
+    if frame.empty:
+        raise AssertionError(f"cannot aggregate empty ledger for {label}")
+    row = {
+        "label": label,
+        "n_days": int(len(frame)),
+        "start_date": str(frame["date"].iloc[0]),
+        "end_date": str(frame["date"].iloc[-1]),
+        "planned_cost_yuan": float(frame["planned_cost_yuan"].sum()),
+        "emergency_cost_yuan": float(frame["emergency_cost_yuan"].sum()),
+        "total_cost_yuan": float(frame["total_cost_yuan"].sum()),
+        "planned_q_kwh": float(frame["planned_q_kwh"].sum()),
+        "actual_x_kwh": float(frame["actual_x_kwh"].sum()),
+        "unused_plan_kwh": float(frame["unused_plan_kwh"].sum()),
+        "emergency_kwh": float(frame["emergency_kwh"].sum()),
+        "curtailment_kwh": float(frame["curtailment_kwh"].sum()),
+        "soc_start_kwh": float(frame["soc_start_kwh"].iloc[0]),
+        "soc_end_kwh": float(frame["soc_end_kwh"].iloc[-1]),
+        "max_balance_residual_kwh": float(frame["max_balance_residual_kwh"].max()),
+        "all_days_pass": bool(frame["pass"].all()),
+        "used_full_day_actual_lp": bool(frame["used_full_day_actual_lp"].any()),
+        "future_actuals_in_optimizer": bool(frame["future_actuals_in_optimizer"].any()),
+    }
+    if extra:
+        row.update(extra)
+    return row
+
+
+def k_sensitivity_conclusion(rows: list[dict]) -> str:
+    """Keep K=8 when cost and emergency remain stable versus K=4 and K=12."""
+    by_k = {int(row["scenario_k"]): row for row in rows if int(row["scenario_k"]) in {4, 8, 12}}
+    if set(by_k) != {4, 8, 12}:
+        raise AssertionError("K sensitivity must report K=4, 8 and 12")
+    costs = np.array([by_k[k]["total_cost_yuan"] for k in (4, 8, 12)], dtype=float)
+    emergencies = np.array([by_k[k]["emergency_kwh"] for k in (4, 8, 12)], dtype=float)
+    cost_span = float(np.max(np.abs(costs - costs[1])) / max(abs(costs[1]), 1.0))
+    emergency_span = float(
+        np.max(np.abs(emergencies - emergencies[1])) / max(abs(emergencies[1]), 1.0)
+    )
+    if cost_span <= 0.05 and emergency_span <= 0.10:
+        return "retain_k8_stable"
+    return "review_k_reselection"
+
+
+def run_frozen_policy_path(
+    data: Q2Data,
+    archives: dict[ForecastMode, ForecastArchive],
+    calendar: list[FrozenDayPolicy],
+    *,
+    start_index: int,
+    end_index: int,
+    initial_soc: float,
+    requested_k: int,
+    soc_source: str,
+    include_value_cuts: bool = True,
+    dispatch_dir: Path | None = None,
+    cut_cache: ValueCutCache | None = None,
+    progress_label: str = "",
+) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+    """Execute a frozen (m, α) calendar with residual MPC; never uses full-day actual LP."""
+    if not 0 <= start_index <= end_index < len(data.dates):
+        raise ValueError("frozen path indices out of range")
+    if len(calendar) != len(data.dates):
+        raise AssertionError("frozen calendar must cover every 2025 day")
+    cache: ValueCutCache = {} if cut_cache is None else cut_cache
+    daily_rows: list[dict] = []
+    forecast_rows: list[dict] = []
+    physical_rows: list[dict] = []
+    value_rows: list[dict] = []
+    soc = float(initial_soc)
+    for i in range(start_index, end_index + 1):
+        policy = calendar[i]
+        if policy.date != data.dates[i].strftime("%Y-%m-%d"):
+            raise AssertionError(f"calendar date mismatch at {i}: {policy.date}")
+        archive = archives[policy.forecast_mode]
+        active_k = policy.effective_k(requested_k)
+        cuts: tuple[ValueCut, ...] | None = None
+        if include_value_cuts:
+            cuts, cut_rows = cached_baseline_value_cuts(
+                cache,
+                data,
+                archive,
+                i,
+                policy.forecast_mode,
+                active_k,
+                policy.risk_alpha,
+            )
+            value_rows.extend({"decision_date": policy.date, **row} for row in cut_rows)
+        dispatch_path = (
+            dispatch_dir / f"dispatch_{policy.date}.csv" if dispatch_dir is not None else None
+        )
+        summary, _frame, _plan, _floor, _scenarios = plan_closed_loop_day(
+            data,
+            archive,
+            i,
+            soc,
+            mode=policy.forecast_mode,
+            risk_alpha=policy.risk_alpha,
+            k=active_k,
+            terminal_value_cuts=cuts,
+            dispatch_path=dispatch_path,
+        )
+        if not summary["pass"]:
+            raise AssertionError(f"physical validation failed on {summary['date']}")
+        summary.update(
+            {
+                "period": output_period(policy.date),
+                "soc_source": soc_source,
+                "requested_k": int(requested_k),
+                "calibration_date": policy.calibration_date,
+                "fallback_reason": policy.fallback_reason,
+                "include_value_cuts": bool(include_value_cuts),
+            }
+        )
+        daily_rows.append(_daily_summary_row(summary))
+        forecast_rows.append(_forecast_audit_row(summary))
+        physical_rows.append(_physical_audit_row(summary))
+        soc = float(summary["soc_end_kwh"])
+        if progress_label and (i == start_index or (i + 1) % 14 == 0 or i == end_index):
+            print(
+                f"{progress_label} {policy.date}: "
+                f"{policy.forecast_mode.value} α={policy.risk_alpha} K={active_k} "
+                f"cost={summary['total_cost_yuan']:.2f}",
+                flush=True,
+            )
+    return daily_rows, forecast_rows, physical_rows, value_rows

@@ -36,6 +36,7 @@ data/raw/*
 *.zip
 *.rar
 *.7z
+output/q2_policy_consistent/dispatch_daily/
 
 # Jupyter / plots caches
 .mypy_cache/

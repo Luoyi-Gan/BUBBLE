@@ -1,0 +1,32 @@
+{
+  "candidate_result2": "output/q2_policy_consistent/result2.xlsx",
+  "signed_off_result2_unchanged": true,
+  "signed_off_sha256": "70a9785c9e2bba66f7694878e4587ad15c57dc090ec6798d07ba6780b4780ef7",
+  "backup": "output/q2_policy_consistent/result2_signed_off_backup.xlsx",
+  "n_days": 334,
+  "n_periods": 144,
+  "units": {
+    "energy": "kWh",
+    "cost": "yuan"
+  },
+  "purchase_sheet_rows": 335,
+  "charge_sheet_rows": 2005,
+  "dated_emergency_rows": 334,
+  "feb1_inherited_soc_kwh": 8390.680830206398,
+  "feb1_xlsx_soc_kwh": 8390.680830206398,
+  "max_q_abs_kwh": 7.275957614183426e-12,
+  "max_planned_cost_abs_yuan": 7.275957614183426e-12,
+  "max_charge_block_abs_kwh": 5.4569682106375694e-12,
+  "max_soc_abs_kwh": 3.637978807091713e-12,
+  "max_soc_continuity_gap_kwh": 0.0,
+  "max_emergency_recon_abs_kwh": 3.637978807091713e-12,
+  "max_balance_residual_kwh": 1.1838210411951877e-09,
+  "xlsx_planned_q_kwh": 19574644.442922786,
+  "ledger_planned_q_kwh": 19574644.442922786,
+  "xlsx_planned_cost_yuan": 11883687.236905472,
+  "ledger_planned_cost_yuan": 11883687.236905474,
+  "xlsx_emergency_kwh": 924502.9287147804,
+  "ledger_emergency_kwh": 924502.9287147812,
+  "ledger_total_cost_yuan": 15166538.460929552,
+  "pass": true
+}
