@@ -19,6 +19,7 @@ from scripts.export_paper_q2_q3 import (  # noqa: E402
     SAMPLE_SLOTS,
     configure_style,
     fmt_num,
+    latex_code,
     load_charge_blocks,
     load_purchase_row,
     render_triplet_table,
@@ -51,7 +52,7 @@ def export_tables() -> dict:
     k_rows = []
     for k in k_meta["k_candidates"]:
         row = k_meta["by_k"][str(k)]
-        conclusion = "retain_k8_stable" if k == k_meta["decision"]["keep_k"] else "review_only"
+        conclusion = latex_code("retain_k8_stable" if k == k_meta["decision"]["keep_k"] else "review_only")
         k_rows.append(
             f"$K={k}$ & {int(row['n_windows'])} & "
             f"{fmt_num(row['total_cost_yuan'], 2)} & "

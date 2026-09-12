@@ -3,7 +3,7 @@
 \noindent\textbf{四时点滚动购电调整算法}
 \algorithmstart
 \algostep{1}{构造日初信息集}
-在每日 $0{:}00$ 汇集全日电价、日初储电量、此前已结束日期的负荷历史与当期光伏预报；按式\eqref{eq:q3-load-forecast}生成日前负荷预测，并将逐小时光伏预报按式\eqref{eq:q3-pv-interpolation}映射至 10 分钟时段。
+在每日 $0{:}00$ 汇集全日电价、日初储电量、此前已结束日期的负荷历史与当期光伏预报；按式\eqref{eq:q3-load-forecast}生成日前负荷预测，并将逐小时光伏预报按式\eqref{eq:q3-pv-interpolation}映射至 10 分钟时段。滚动回测中，预测训练样本严格早于决策时点\cite{tashman}。
 \algostep{2}{生成日初承诺}
 以预测供需、储能约束和终端价值求解日初 LP，得到 $g^0_{d,t}$ 及初始储能预案；该承诺成为当天所有调整结算的唯一基准。
 \algostep{3}{实时执行一个时段}

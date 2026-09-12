@@ -63,6 +63,11 @@ def fmt_num(value: float, digits: int = 4) -> str:
     return f"{float(value):.{digits}f}"
 
 
+def latex_code(text: str) -> str:
+    escaped = text.replace("_", "\\_")
+    return f"\\texttt{{{escaped}}}"
+
+
 def latex_escape(text: str) -> str:
     return (
         text.replace("\\", "\\textbackslash{}")
@@ -350,7 +355,7 @@ def export_q2_tables() -> dict:
         k_rows.append(
             f"$K={int(row.scenario_k)}$ & {int(row.n_days)} & "
             f"{fmt_num(row.total_cost_yuan, 2)} & {fmt_num(row.emergency_kwh, 2)} & "
-            f"{fmt_num(row.elapsed_seconds, 1)} & {row.conclusion} \\\\"
+            f"{fmt_num(row.elapsed_seconds, 1)} & {latex_code(str(row.conclusion))} \\\\"
         )
     param_tex = f"""\\begin{{table}}[htbp]
 \\centering
@@ -484,7 +489,7 @@ def export_q3_tables() -> dict:
 \\centering
 \\caption{{问题三全年策略比较（A 边界；1--12 月连续运行口径）}}\\label{{tab:q3-strategy-compare}}
 \\normalsize\\setlength{{\\tabcolsep}}{{5pt}}
-\\begin{{tabular}}{{@{{}}lrrrr@{{}}}}
+\\begin{{tabular}}{{@{{}}lrrrrr@{{}}}}
 \\toprule
 策略 & 总成本/元 & 结算成本/元 & 紧急购电/元 & 紧急购电/kWh & 调整次数 \\\\
 \\midrule
