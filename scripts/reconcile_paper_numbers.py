@@ -322,6 +322,50 @@ def load_q3(rows: list[Row]) -> None:
         )
 
 
+def load_q4_2(rows: list[Row]) -> None:
+    meta = json.loads((ROOT / "output" / "q4" / "q4_2_run_metadata.json").read_text())
+    daily = pd.read_csv(ROOT / "output" / "q4" / "q4_2_warmup_daily.csv")
+    daily["date"] = pd.to_datetime(daily["date"])
+    feb = daily[(daily["date"] >= "2025-02-01") & (daily["date"] <= "2025-12-31")]
+    q2_feb = 15166538.46
+
+    checks = [
+        ("sections/q4/05_results.tex", "2-12月总成本", 2, float(meta["export_window_cost_yuan"]), 15257873.75),
+        ("sections/q4/05_results.tex", "1-12月总成本", 2, float(meta["annual_cost_yuan"]), 17681029.10),
+        ("sections/q4/05_results.tex", "相对Q2增加", 2, float(meta["export_window_cost_yuan"]) - q2_feb, 91335.29),
+        ("tables/q4/cost_summary.tex", "2-12月计划成本", 2, float(feb["normal_cost_yuan"].sum()), 13213373.44),
+        ("tables/q4/cost_summary.tex", "2-12月紧急成本", 2, float(feb["emergency_cost_yuan"].sum()), 2044500.32),
+    ]
+    for loc, metric, digits, src, paper in checks:
+        check_numeric(
+            rows,
+            question="Q4-2",
+            paper_location=loc,
+            metric=metric,
+            unit="元",
+            digits=digits,
+            paper_value=paper,
+            source_file=ROOT / "output/q4/q4_2_run_metadata.json",
+            source_column=metric,
+            source_value=src,
+        )
+
+    phys = json.loads((ROOT / "output" / "q4" / "q4_2_physical_audit.json").read_text())
+    add(
+        rows,
+        question="Q4-2",
+        paper_location="sections/q4/06_validation.tex",
+        metric="365日物理审计",
+        unit="-",
+        display_precision="-",
+        paper_value="PASS",
+        source_file="output/q4/q4_2_physical_audit.json",
+        source_column="n_days_pass",
+        source_value=str(phys.get("n_days_pass")),
+        status="已核" if phys.get("n_days_pass") == 365 else "不一致",
+    )
+
+
 def render_markdown(rows: list[Row]) -> str:
     now = datetime.now(UTC).strftime("%Y-%m-%d %H:%M UTC")
     passed = sum(1 for r in rows if r.status == "已核")
@@ -347,13 +391,16 @@ def render_markdown(rows: list[Row]) -> str:
         "| Q3 | A边界 + `M1_M6` | `q3_annual_strategy_comparison.csv`、`result3.xlsx` | "
         + ("已核" if not any(r.question == "Q3" and r.status == "不一致" for r in rows) else "存在不一致")
         + " |",
-        "| Q4 | 结果未放行 | — | 未核（正文无数字） |",
+        "| Q4-2 | 波动电价 Q2 链 | `result4-2.xlsx`、`q4_2_*` | "
+        + ("已核" if not any(r.question == "Q4-2" and r.status == "不一致" for r in rows) else "存在不一致")
+        + " |",
+        "| Q4-3 | 待签收 | — | 未核 |",
         "",
         "## 口径提醒（写入摘要前必读）",
         "",
         "- Q2：2–12 月 **15,166,538.46 元** 为题设输出区间；1 月预热 **1,977,568.32 元** 须分列，不得相加混报。",
         "- Q3：全年 **16,373,508.75 元** 为 1–12 月主结论；**14,512,748.53 元** 仅为 `result3.xlsx` 的 2–12 月核对区间。",
-        "- Q4：待 RQ4-C1 与物理审计通过后方可对账。",
+        "- Q4-2：2–12 月 **15,257,873.75 元** 为题设输出区间；与 Q2 V2 同区间差 **+91,335.29 元**。Q4-3 待签收。",
         "",
         "## 逐条对账",
         "",
@@ -377,13 +424,14 @@ def render_markdown(rows: list[Row]) -> str:
                 "",
                 "## 结论",
                 "",
-                "Q1–Q3 正文与表格数字均可在展示精度内回链至正式 `output/` 台账；可进入摘要/评价写作前的数字锁定阶段。",
+                "Q1–Q4-2 正文与表格数字均可在展示精度内回链至正式 `output/` 台账。",
                 "",
                 "## ACCT 签收清单",
                 "",
                 "- [x] Q1–Q3 逐条对账（本文件 + `reconciliation_audit.json`）",
                 "- [x] Q1 专用视图：`paper/q1_reconciliation.md`",
-                "- [ ] Q4 待 RQ4-C1 与物理审计后再对账",
+                "- [x] Q4-2 逐条对账",
+                "- [ ] Q4-3 待签收后再对账",
                 "- [ ] 摘要/评价写作时再次引用本对账单",
                 "",
                 "**复跑：** `python3 scripts/reconcile_paper_numbers.py`（退出码 0 = 全部已核）",
@@ -397,6 +445,7 @@ def main() -> int:
     load_q1(rows)
     load_q2(rows)
     load_q3(rows)
+    load_q4_2(rows)
 
     audit_path = PAPER / "reconciliation_audit.json"
     md_path = PAPER / "reconciliation.md"

@@ -1,0 +1,13 @@
+\begin{table}[htbp]
+\centering
+\caption{问题四（Q4-2）情景数 $K$ 的闭环复核（与正式部署同一 $\alpha$ 校准协议）}\label{tab:q4-parameter}
+\normalsize\setlength{\tabcolsep}{5pt}
+\begin{tabular}{@{}crrrrl@{}}
+\toprule
+$K$ & 窗口数 & 验证总成本/元 & 验证紧急费/元 & 平均耗时/s & 结论 \\
+\midrule
+$K=4$ & 25 & 16315671.52 & 2215476.92 & 4.8 & review_only \\
+$K=8$ & 25 & 16234219.00 & 2067551.15 & 5.6 & retain_k8_stable \\
+$K=12$ & 25 & 16194910.76 & 1985536.60 & 6.7 & review_only \\\bottomrule
+\end{tabular}
+\end{table}

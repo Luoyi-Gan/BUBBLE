@@ -1,0 +1,31 @@
+{
+  "git_commit": "6faf5cd5315ecd608c243d759378c2d7f56bb649",
+  "system": "q4_2",
+  "full_year": true,
+  "n_days": 365,
+  "annual_cost_yuan": 17681029.09881317,
+  "soc_continuity": {
+    "n_days": 365,
+    "max_soc_gap_kwh": 0.0,
+    "pass": true
+  },
+  "n_days_pass": 365,
+  "end_soc": 1200.0,
+  "pam_seed": 0,
+  "load_information_case": "causal_load_main",
+  "settlement_rule": "delivery_time_actual_price",
+  "elapsed_seconds": 9904.621444903998,
+  "wrote_result4_xlsx": true,
+  "export_window_cost_yuan": 15257873.753971763,
+  "n_calibration_windows": 25,
+  "selected_alphas": [
+    0.6,
+    0.7
+  ],
+  "alpha_policy_loop": "day_ahead_joint_q+locked_q+causal_mpc+next_day_value_cuts",
+  "used_full_day_actual_scheduler": false,
+  "two_day_costs": {
+    "2025-02-01": 19757.45854298777,
+    "2025-06-21": 22322.36098095029
+  }
+}

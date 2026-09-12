@@ -1,0 +1,83 @@
+{
+  "k_candidates": [
+    4,
+    8,
+    12
+  ],
+  "reference_alpha": 0.6,
+  "n_windows": 25,
+  "calibration_dates": [
+    "2025-01-29",
+    "2025-02-12",
+    "2025-02-26",
+    "2025-03-12",
+    "2025-03-26",
+    "2025-04-09",
+    "2025-04-23",
+    "2025-05-07",
+    "2025-05-21",
+    "2025-06-04",
+    "2025-06-18",
+    "2025-07-02",
+    "2025-07-16",
+    "2025-07-30",
+    "2025-08-13",
+    "2025-08-27",
+    "2025-09-10",
+    "2025-09-24",
+    "2025-10-08",
+    "2025-10-22",
+    "2025-11-05",
+    "2025-11-19",
+    "2025-12-03",
+    "2025-12-17",
+    "2025-12-31"
+  ],
+  "policy_loop": "day_ahead_joint_q+locked_q+causal_mpc+next_day_value_cuts",
+  "used_full_day_actual_scheduler": false,
+  "no_future_info": true,
+  "by_k": {
+    "4": {
+      "n_windows": 25,
+      "n_validation_days_total": 350,
+      "mean_cost_per_day_yuan": 46616.204352103014,
+      "total_cost_yuan": 16315671.523236053,
+      "total_planned_fee_yuan": 14100194.606429754,
+      "total_emergency_fee_yuan": 2215476.9168063,
+      "total_unused_quota_kwh": 1011306.5992519248,
+      "mean_elapsed_seconds": 4.822954479194366
+    },
+    "8": {
+      "n_windows": 25,
+      "n_validation_days_total": 350,
+      "mean_cost_per_day_yuan": 46383.48286652729,
+      "total_cost_yuan": 16234219.003284551,
+      "total_planned_fee_yuan": 14166667.854079254,
+      "total_emergency_fee_yuan": 2067551.1492052963,
+      "total_unused_quota_kwh": 1040490.7542152487,
+      "mean_elapsed_seconds": 5.6426665902030075
+    },
+    "12": {
+      "n_windows": 25,
+      "n_validation_days_total": 350,
+      "mean_cost_per_day_yuan": 46271.173591125254,
+      "total_cost_yuan": 16194910.756893838,
+      "total_planned_fee_yuan": 14209374.161084902,
+      "total_emergency_fee_yuan": 1985536.5958089372,
+      "total_unused_quota_kwh": 1073494.911512521,
+      "mean_elapsed_seconds": 6.740417421451463
+    }
+  },
+  "decision": {
+    "best_k_by_mean_cost": 12,
+    "k8_mean_cost_yuan": 46383.48286652729,
+    "best_mean_cost_yuan": 46271.173591125254,
+    "k8_cost_gap_vs_best": 0.002427197468437961,
+    "k8_within_1pct_of_best": true,
+    "k8_time_acceptable": true,
+    "k8_stable": true,
+    "keep_k": 8,
+    "reason": "K=8 remains within 1% of the best reviewed K and solve time is acceptable; keep K=8."
+  },
+  "elapsed_seconds": 6022.281377826999
+}

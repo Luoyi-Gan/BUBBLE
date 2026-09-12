@@ -1,11 +1,11 @@
 # 论文数字对账单（ACCT）
 
-> 生成时间：2026-09-12 14:38 UTC；脚本：`scripts/reconcile_paper_numbers.py`
+> 生成时间：2026-09-12 14:58 UTC；脚本：`scripts/reconcile_paper_numbers.py`
 
 ## 签收摘要
 
-- 核对条目：**32**
-- **已核：32**
+- 核对条目：**38**
+- **已核：38**
 - **不一致：0**
 - **未核：0**
 
@@ -14,7 +14,8 @@
 | Q1 | M1，表2公共母线侧 | `output/result1.xlsx`、`q1_summary.csv` | 已核 |
 | Q2 | **V2 政策一致 K=8** | `output/result2.xlsx`、`q2_policy_consistent/` | 已核 |
 | Q3 | A边界 + `M1_M6` | `q3_annual_strategy_comparison.csv`、`result3.xlsx` | 已核 |
-| Q4 | 结果未放行 | — | 未核（正文无数字） |
+| Q4-2 | 波动电价 Q2 链 | `result4-2.xlsx`、`q4_2_*` | 已核 |
+| Q4-3 | 待签收 | — | 未核 |
 
 ## 口径提醒（写入摘要前必读）
 
@@ -58,6 +59,12 @@
 | Q3 | `tables/q3/strategy_comparison.tex` | M1_M6结算成本 | 元/%/次 | 2 | 13602473.20 | `output/q3_full_annual/q3_annual_strategy_comparison.csv` | M1_M6结算成本 | 13602473.196 | **已核** |  |
 | Q3 | `tables/q3/strategy_comparison.tex` | M1_M6紧急购电/kWh | 元/%/次 | 2 | 742322.81 | `output/q3_full_annual/q3_annual_strategy_comparison.csv` | M1_M6紧急购电/kWh | 742322.81341 | **已核** |  |
 | Q3 | `tables/q3/strategy_comparison.tex` | 调整次数 | 元/%/次 | 0 | 947 | `output/q3_full_annual/q3_annual_strategy_comparison.csv` | 调整次数 | 947 | **已核** |  |
+| Q4-2 | `sections/q4/05_results.tex` | 2-12月总成本 | 元 | 2 | 15257873.75 | `output/q4/q4_2_run_metadata.json` | 2-12月总成本 | 15257873.754 | **已核** |  |
+| Q4-2 | `sections/q4/05_results.tex` | 1-12月总成本 | 元 | 2 | 17681029.10 | `output/q4/q4_2_run_metadata.json` | 1-12月总成本 | 17681029.0988 | **已核** |  |
+| Q4-2 | `sections/q4/05_results.tex` | 相对Q2增加 | 元 | 2 | 91335.29 | `output/q4/q4_2_run_metadata.json` | 相对Q2增加 | 91335.2939718 | **已核** |  |
+| Q4-2 | `tables/q4/cost_summary.tex` | 2-12月计划成本 | 元 | 2 | 13213373.44 | `output/q4/q4_2_run_metadata.json` | 2-12月计划成本 | 13213373.4386 | **已核** |  |
+| Q4-2 | `tables/q4/cost_summary.tex` | 2-12月紧急成本 | 元 | 2 | 2044500.32 | `output/q4/q4_2_run_metadata.json` | 2-12月紧急成本 | 2044500.31534 | **已核** |  |
+| Q4-2 | `sections/q4/06_validation.tex` | 365日物理审计 | - | - | PASS | `output/q4/q4_2_physical_audit.json` | n_days_pass | 365 | **已核** |  |
 
 ## 结论
 
@@ -67,7 +74,8 @@ Q1–Q3 正文与表格数字均可在展示精度内回链至正式 `output/` �
 
 - [x] Q1–Q3 逐条对账（本文件 + `reconciliation_audit.json`）
 - [x] Q1 专用视图：`paper/q1_reconciliation.md`
-- [ ] Q4 待 RQ4-C1 与物理审计后再对账
+- [x] Q4-2 逐条对账
+- [ ] Q4-3 待签收后再对账
 - [ ] 摘要/评价写作时再次引用本对账单
 
 **复跑：** `python3 scripts/reconcile_paper_numbers.py`（退出码 0 = 全部已核）

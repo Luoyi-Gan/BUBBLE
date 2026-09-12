@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-12T14:38:49.775135Z",
+  "generated_at": "2026-09-12T14:58:16.820902Z",
   "rows": [
     {
       "question": "Q1",
@@ -416,11 +416,89 @@
       "source_value": "947",
       "status": "已核",
       "note": ""
+    },
+    {
+      "question": "Q4-2",
+      "paper_location": "sections/q4/05_results.tex",
+      "metric": "2-12月总成本",
+      "unit": "元",
+      "display_precision": "2",
+      "paper_value": "15257873.75",
+      "source_file": "output/q4/q4_2_run_metadata.json",
+      "source_column": "2-12月总成本",
+      "source_value": "15257873.754",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-2",
+      "paper_location": "sections/q4/05_results.tex",
+      "metric": "1-12月总成本",
+      "unit": "元",
+      "display_precision": "2",
+      "paper_value": "17681029.10",
+      "source_file": "output/q4/q4_2_run_metadata.json",
+      "source_column": "1-12月总成本",
+      "source_value": "17681029.0988",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-2",
+      "paper_location": "sections/q4/05_results.tex",
+      "metric": "相对Q2增加",
+      "unit": "元",
+      "display_precision": "2",
+      "paper_value": "91335.29",
+      "source_file": "output/q4/q4_2_run_metadata.json",
+      "source_column": "相对Q2增加",
+      "source_value": "91335.2939718",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-2",
+      "paper_location": "tables/q4/cost_summary.tex",
+      "metric": "2-12月计划成本",
+      "unit": "元",
+      "display_precision": "2",
+      "paper_value": "13213373.44",
+      "source_file": "output/q4/q4_2_run_metadata.json",
+      "source_column": "2-12月计划成本",
+      "source_value": "13213373.4386",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-2",
+      "paper_location": "tables/q4/cost_summary.tex",
+      "metric": "2-12月紧急成本",
+      "unit": "元",
+      "display_precision": "2",
+      "paper_value": "2044500.32",
+      "source_file": "output/q4/q4_2_run_metadata.json",
+      "source_column": "2-12月紧急成本",
+      "source_value": "2044500.31534",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-2",
+      "paper_location": "sections/q4/06_validation.tex",
+      "metric": "365日物理审计",
+      "unit": "-",
+      "display_precision": "-",
+      "paper_value": "PASS",
+      "source_file": "output/q4/q4_2_physical_audit.json",
+      "source_column": "n_days_pass",
+      "source_value": "365",
+      "status": "已核",
+      "note": ""
     }
   ],
   "summary": {
-    "total": 32,
-    "passed": 32,
+    "total": 38,
+    "passed": 38,
     "failed": 0
   }
 }
