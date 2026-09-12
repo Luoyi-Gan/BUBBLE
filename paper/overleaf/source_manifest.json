@@ -14,8 +14,10 @@
   "q1_total_from_summary": 57526.24348088351,
   "status": {
     "q1": "method_and_data_done__paper_integrated",
-    "q2": "policy_consistent_output_interval_result__paper_integrated",
-    "q3": "annual_causal_result_and_export__paper_integrated",
-    "q4": "running__paper_results_blocked"
-  }
+    "q2": "policy_consistent_tables_figures_exported__paper_integrated",
+    "q3": "annual_tables_figures_exported__paper_integrated",
+    "q4": "method_written__results_blocked_until_rq4_c1"
+  },
+  "paper_assets_script": "scripts/export_paper_q2_q3.py",
+  "paper_assets_audit": "paper/overleaf/paper_assets_audit.json"
 }
