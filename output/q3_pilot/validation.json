@@ -1,0 +1,10 @@
+{
+  "all_pass": true,
+  "failures": [],
+  "n_comparison_rows": 24,
+  "n_main_comparison_rows": 10,
+  "n_mapping_rows": 1152,
+  "n_unlabeled_legacy_dispatch_files": 12,
+  "max_simultaneous_cd_tol": 0.0001,
+  "load_treatment": "causal_load_main"
+}

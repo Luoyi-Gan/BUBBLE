@@ -1,0 +1,15 @@
+{
+  "probes": [
+    {
+      "date": "2025-02-01",
+      "day_ahead_insensitive_to_future": true,
+      "intraday_06_insensitive_to_unended_prices": true
+    },
+    {
+      "date": "2025-06-21",
+      "day_ahead_insensitive_to_future": true,
+      "intraday_06_insensitive_to_unended_prices": true
+    }
+  ],
+  "all_pass": true
+}
