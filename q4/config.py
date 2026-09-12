@@ -1,4 +1,4 @@
-"""Q4 causal price-forecast configuration. No storage dispatch in this module."""
+"""Q4 configuration. Price-forecast constants stay aligned with the accepted P1 module."""
 
 from __future__ import annotations
 
@@ -8,6 +8,24 @@ OUTPUT_DIR = ROOT / "output" / "q4"
 AUDIT_CSV = OUTPUT_DIR / "q4_price_forecast_audit.csv"
 TWODAY_JSON = OUTPUT_DIR / "q4_price_forecast_twoday.json"
 CAUSALITY_JSON = OUTPUT_DIR / "q4_price_forecast_causality.json"
+
+Q4_2_DISPATCH_DIR = OUTPUT_DIR / "q4_2_dispatch_daily"
+Q4_3_DISPATCH_DIR = OUTPUT_DIR / "q4_3_dispatch_daily"
+RESULT4_2_XLSX = ROOT / "output" / "result4-2.xlsx"
+RESULT4_3_XLSX = ROOT / "output" / "result4-3.xlsx"
+
+RESIDUAL_POOL_DAYS = 28
+FIXED_SCENARIO_K = 8
+RISK_ALPHA_CANDIDATES = (0.60, 0.70, 0.80, 0.90)
+RISK_CALIBRATION_DAYS = 14
+RISK_WARMUP_DAYS = 28
+PAM_SEED = 0
+LOAD_INFORMATION_CASE = "causal_load_main"
+Q4_2_YEAR_END_RULE = "q2_accepted_no_hard_terminal"
+Q4_3_YEAR_END_BOUNDARY = "A_q2_aligned"
+Q4_3_YEAR_END_SOC_KWH = 1200.0
+Q4_3_STRATEGY = "M1_M6"
+SETTLEMENT_RULE = "delivery_time_actual_price"
 
 CANDIDATE_MODELS = (1, 2, 4)
 CANDIDATE_NAMES = {
