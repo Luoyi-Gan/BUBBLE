@@ -1,0 +1,251 @@
+"""Sequential Q4-2 / Q4-3 campaigns with streamed daily outputs."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+from q2.config import E_INITIAL_KWH
+from q3.config import PILOT_DATES
+from q4.bundle import Q4Bundle
+from q4.config import (
+    FIXED_SCENARIO_K,
+    OUTPUT_DIR,
+    PAM_SEED,
+    Q4_2_DISPATCH_DIR,
+    Q4_3_DISPATCH_DIR,
+    RISK_CALIBRATION_DAYS,
+    RISK_WARMUP_DAYS,
+)
+from q4.q4_2 import alpha_for_day, run_q4_2_day, select_risk_alpha
+from q4.q4_3 import run_q4_3_day
+
+
+def _append_csv(path: Path, frame: pd.DataFrame) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header = not path.exists() or path.stat().st_size == 0
+    frame.to_csv(path, mode="a", header=header, index=False)
+
+
+def last_index_for_dates(bundle: Q4Bundle, dates: tuple[str, ...]) -> int:
+    return max(bundle.date_index(date) for date in dates)
+
+
+def run_q4_2_campaign(
+    bundle: Q4Bundle,
+    end_index: int,
+    detail_dates: tuple[str, ...] = PILOT_DATES,
+    out_dir: Path = OUTPUT_DIR,
+    write_all_dispatch: bool = False,
+) -> dict:
+    Q4_2_DISPATCH_DIR.mkdir(parents=True, exist_ok=True)
+    daily_path = out_dir / "q4_2_warmup_daily.csv"
+    ahead_path = out_dir / "q4_2_day_ahead_audit.csv"
+    scen_path = out_dir / "q4_2_scenario_audit.csv"
+    ledger_path = out_dir / "q4_2_cost_ledger.csv"
+    alpha_sel_path = out_dir / "q4_2_alpha_selection.csv"
+    alpha_daily_path = out_dir / "q4_2_alpha_calibration_daily.csv"
+    for path in (
+        daily_path,
+        ahead_path,
+        scen_path,
+        ledger_path,
+        alpha_sel_path,
+        alpha_daily_path,
+    ):
+        if path.exists():
+            path.unlink()
+    soc = E_INITIAL_KWH
+    start_soc = np.full(bundle.n_days(), np.nan)
+    calibrated: dict[int, float | None] = {}
+    detail = {}
+    for i in range(end_index + 1):
+        start_soc[i] = soc
+        cal = (i // RISK_CALIBRATION_DAYS) * RISK_CALIBRATION_DAYS
+        if i >= RISK_WARMUP_DAYS and cal not in calibrated and i == cal:
+            choice = select_risk_alpha(
+                bundle, start_soc, i, FIXED_SCENARIO_K, log=True
+            )
+            calibrated[cal] = choice.selected_alpha
+            cal_date = bundle.prices.dates[i].strftime("%Y-%m-%d")
+            window_frame = pd.DataFrame(
+                [{"calibration_date": cal_date, **row} for row in choice.window_records]
+            )
+            daily_frame = pd.DataFrame(
+                [{"calibration_date": cal_date, **row} for row in choice.daily_records]
+            )
+            _append_csv(alpha_sel_path, window_frame)
+            if not daily_frame.empty:
+                _append_csv(alpha_daily_path, daily_frame)
+            print(
+                f"Q4-2 calibrated alpha={choice.selected_alpha} at {cal_date}",
+                flush=True,
+            )
+        elif i < RISK_WARMUP_DAYS:
+            calibrated.setdefault(cal, None)
+        alpha = alpha_for_day(i, calibrated)
+        date = bundle.prices.dates[i].strftime("%Y-%m-%d")
+        keep = write_all_dispatch or date in detail_dates
+        write_path = Q4_2_DISPATCH_DIR / f"dispatch_{date}.csv" if keep else None
+        result = run_q4_2_day(bundle, i, soc, alpha, write_dispatch=write_path)
+        soc = float(result.summary["soc_end_kwh"])
+        _append_csv(daily_path, pd.DataFrame([result.summary]))
+        _append_csv(ahead_path, pd.DataFrame([result.day_ahead_audit]))
+        if result.scenario_rows:
+            _append_csv(scen_path, pd.DataFrame(result.scenario_rows))
+        if keep:
+            nrm = result.dispatch["actual_price"] * result.dispatch["q_or_g0_kwh"]
+            emg = 5.0 * result.dispatch["actual_price"] * result.dispatch["emergency_kwh"]
+            _append_csv(
+                ledger_path,
+                pd.DataFrame(
+                    {
+                        "date": result.dispatch["date"],
+                        "period_index": result.dispatch["period_index"],
+                        "normal_cost_yuan": nrm,
+                        "adjustment_cost_yuan": 0.0,
+                        "emergency_cost_yuan": emg,
+                        "total_cost_yuan": nrm + emg,
+                    }
+                ),
+            )
+            if date in detail_dates:
+                detail[date] = result
+        print(
+            f"Q4-2 [{i+1}/{end_index+1}] {date} cost={result.summary['total_cost_yuan']:.2f} "
+            f"soc={soc:.2f} K={result.summary['k_effective']} alpha={alpha}",
+            flush=True,
+        )
+        if date not in detail:
+            del result
+    return {"detail": detail, "end_soc": soc, "calibrated_alpha": calibrated}
+
+
+def run_q4_3_campaign(
+    bundle: Q4Bundle,
+    end_index: int,
+    detail_dates: tuple[str, ...] = PILOT_DATES,
+    out_dir: Path = OUTPUT_DIR,
+    write_all_dispatch: bool = False,
+    *,
+    price_mode: str = "causal",
+    dispatch_dir: Path | None = None,
+    daily_name: str = "q4_3_warmup_daily.csv",
+    update_name: str = "q4_3_update_log.csv",
+    ledger_name: str = "q4_3_cost_ledger.csv",
+    commitment_prefix: str = "q4_3_commitment_versions",
+    unlink_existing: bool = True,
+) -> dict:
+    dest = Q4_3_DISPATCH_DIR if dispatch_dir is None else dispatch_dir
+    dest.mkdir(parents=True, exist_ok=True)
+    daily_path = out_dir / daily_name
+    update_path = out_dir / update_name
+    ledger_path = out_dir / ledger_name
+    if unlink_existing:
+        for path in (daily_path, update_path, ledger_path):
+            if path.exists():
+                path.unlink()
+    soc = E_INITIAL_KWH
+    cache: dict = {}
+    detail = {}
+    for i in range(end_index + 1):
+        date = bundle.prices.dates[i].strftime("%Y-%m-%d")
+        keep = write_all_dispatch or date in detail_dates
+        result = run_q4_3_day(
+            bundle, i, soc, value_cut_cache=cache, price_mode=price_mode
+        )
+        soc = float(result.summary["soc_end_kwh"])
+        _append_csv(daily_path, pd.DataFrame([result.summary]))
+        _append_csv(update_path, result.update_log)
+        if keep:
+            result.dispatch.to_csv(dest / f"dispatch_{date}.csv", index=False)
+            ledger = result.dispatch[
+                ["date", "period_index", "normal_cost_yuan", "adjustment_cost_yuan", "emergency_cost_yuan"]
+            ].copy()
+            ledger["total_cost_yuan"] = (
+                ledger["normal_cost_yuan"]
+                + ledger["adjustment_cost_yuan"]
+                + ledger["emergency_cost_yuan"]
+            )
+            _append_csv(ledger_path, ledger)
+            if date in detail_dates:
+                pd.DataFrame(
+                    {
+                        "date": date,
+                        "period_index": np.arange(len(result.g0)),
+                        "g0_kwh": result.g0,
+                        "g_final_kwh": result.g_final,
+                    }
+                ).to_csv(out_dir / f"{commitment_prefix}_{date}.csv", index=False)
+                detail[date] = result
+        print(
+            f"Q4-3/{price_mode} [{i+1}/{end_index+1}] {date} "
+            f"cost={result.summary['total_cost_yuan']:.2f} "
+            f"soc={soc:.2f} adj={result.summary['adjustment_count']}",
+            flush=True,
+        )
+        if date not in detail:
+            del result
+    return {"detail": detail, "end_soc": soc, "pam_seed": PAM_SEED, "price_mode": price_mode}
+
+
+def load_q42_detail_from_disk(
+    out_dir: Path = OUTPUT_DIR,
+    detail_dates: tuple[str, ...] = PILOT_DATES,
+) -> dict:
+    """Rebuild the in-memory Q4-2 pilot detail from streamed CSVs."""
+    from q4.q4_2 import Q42DayResult
+
+    daily = pd.read_csv(out_dir / "q4_2_warmup_daily.csv")
+    detail = {}
+    for date in detail_dates:
+        path = Q4_2_DISPATCH_DIR / f"dispatch_{date}.csv"
+        dispatch = pd.read_csv(path)
+        row = daily.loc[daily["date"] == date].iloc[0].to_dict()
+        alpha = row.get("risk_alpha")
+        if alpha is None or (isinstance(alpha, float) and not np.isfinite(alpha)):
+            row["risk_alpha"] = None
+        detail[date] = Q42DayResult(
+            date=date,
+            day_index=int(row["day_index"]),
+            q=dispatch["q_or_g0_kwh"].to_numpy(float),
+            dispatch=dispatch,
+            summary=row,
+            day_ahead_audit={},
+        )
+    return {"detail": detail, "end_soc": float(daily["soc_end_kwh"].iloc[-1]), "from_disk": True}
+
+
+def load_q43_detail_from_disk(
+    out_dir: Path = OUTPUT_DIR,
+    detail_dates: tuple[str, ...] = PILOT_DATES,
+) -> dict:
+    """Rebuild the in-memory Q4-3 pilot detail from streamed CSVs."""
+    from q4.q4_3 import Q43DayResult
+
+    daily = pd.read_csv(out_dir / "q4_3_warmup_daily.csv")
+    updates = pd.read_csv(out_dir / "q4_3_update_log.csv")
+    detail = {}
+    for date in detail_dates:
+        dispatch = pd.read_csv(Q4_3_DISPATCH_DIR / f"dispatch_{date}.csv")
+        row = daily.loc[daily["date"] == date].iloc[0].to_dict()
+        versions = out_dir / f"q4_3_commitment_versions_{date}.csv"
+        if versions.exists():
+            ver = pd.read_csv(versions)
+            g0 = ver["g0_kwh"].to_numpy(float)
+            g_final = ver["g_final_kwh"].to_numpy(float)
+        else:
+            g0 = dispatch["q_or_g0_kwh"].to_numpy(float)
+            g_final = dispatch["g_final_kwh"].to_numpy(float)
+        detail[date] = Q43DayResult(
+            date=date,
+            day_index=int(row["day_index"]),
+            g0=g0,
+            g_final=g_final,
+            dispatch=dispatch,
+            update_log=updates.loc[updates["date"] == date].copy(),
+            summary=row,
+        )
+    return {"detail": detail, "end_soc": float(daily["soc_end_kwh"].iloc[-1]), "from_disk": True}
