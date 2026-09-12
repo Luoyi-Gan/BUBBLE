@@ -32,8 +32,12 @@ ATTACH_DIR = resolve_attach_dir()
 ATTACH1 = ATTACH_DIR / "附件1.xlsx"
 ATTACH2 = ATTACH_DIR / "附件2.xlsx"
 ATTACH3 = ATTACH_DIR / "附件3.xlsx"
+ATTACH4 = ATTACH_DIR / "附件4.xlsx"
+RESULT3_TEMPLATE = ATTACH_DIR / "附件5" / "result3.xlsx"
 OUTPUT_DIR = ROOT / "output" / "q3_pilot"
 FIG_DIR = ROOT / "fig" / "q3_pilot"
+RESULT3_XLSX = ROOT / "output" / "result3.xlsx"
+RESULT3_EXPORT_AUDIT = ROOT / "output" / "result3_export_audit.json"
 
 T = 144
 DELTA_H = 1.0 / 6.0
@@ -91,6 +95,37 @@ ANNUAL_OUTPUT_DIR = ROOT / "output" / "q3_full_annual"
 ANNUAL_FIG_DIR = ROOT / "fig" / "q3_full_annual"
 ANNUAL_START = "2025-01-01"
 ANNUAL_END = "2025-12-31"
+RESULT3_EXPORT_START = "2025-02-01"
+RESULT3_EXPORT_END = "2025-12-31"
+RESULT3_EXPORT_N_DAYS = 334
+RESULT3_OFFICIAL_STRATEGY = "M1_M6"
+RESULT3_ANNUAL_COST_YUAN = 16373508.75
+FOUR_HOUR_BLOCKS = (
+    ("0:00-4:00", 0, 24),
+    ("4:00-8:00", 24, 48),
+    ("8:00-12:00", 48, 72),
+    ("12:00-16:00", 72, 96),
+    ("16:00-20:00", 96, 120),
+    ("20:00-24:00", 120, 144),
+)
+REQUIRED_TRAJECTORY_COLS = (
+    "date",
+    "period_index",
+    "time_label",
+    "g0_kwh",
+    "g_final_kwh",
+    "x_kwh",
+    "emergency_kwh",
+    "charge_kwh",
+    "discharge_kwh",
+    "curtailment_kwh",
+    "soc_start_kwh",
+    "soc_end_kwh",
+    "actual_load_kwh",
+    "actual_pv_kwh",
+    "locked_or_mutable",
+    "last_update_time",
+)
 
 
 def year_end_tag(year_end_soc_kwh: float | None) -> str:
