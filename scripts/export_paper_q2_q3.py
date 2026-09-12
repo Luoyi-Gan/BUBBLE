@@ -81,6 +81,9 @@ def configure_style() -> str:
     available = {font.name for font in font_manager.fontManager.ttflist}
     candidates = (
         "Noto Sans CJK SC",
+        "Microsoft YaHei",
+        "SimHei",
+        "SimSun",
         "PingFang SC",
         "Hiragino Sans GB",
         "Heiti SC",
@@ -318,7 +321,7 @@ def export_q2_tables() -> dict:
         emergency_lines.append(f"{interval} & {fmt_num(amount)} & 紧急购电 \\\\")
     if len(emergency) > 8:
         emergency_lines.append(
-            f"\\multicolumn{{3}}{{c}}{{其余 {len(emergency) - 8} 条记录见 \\texttt{{result2.xlsx}}}} \\\\"
+            f"\\multicolumn{{3}}{{c}}{{其余 {len(emergency) - 8} 条记录见随附正式工作簿}} \\\\"
         )
     emergency_lines.extend(
         [
@@ -352,15 +355,16 @@ def export_q2_tables() -> dict:
 
     k_rows = []
     for _, row in k_df.iterrows():
+        conclusion = "主方案" if int(row.scenario_k) == 8 else "对照"
         k_rows.append(
             f"$K={int(row.scenario_k)}$ & {int(row.n_days)} & "
             f"{fmt_num(row.total_cost_yuan, 2)} & {fmt_num(row.emergency_kwh, 2)} & "
-            f"{fmt_num(row.elapsed_seconds, 1)} & {latex_code(str(row.conclusion))} \\\\"
+            f"{fmt_num(row.elapsed_seconds, 1)} & {conclusion} \\\\"
         )
     param_tex = f"""\\begin{{table}}[htbp]
 \\centering
 \\caption{{问题二情景数 $K$ 的闭环复核（2--12 月输出区间；正式主方案取 $K=8$）}}\\label{{tab:q2-parameter}}
-\\normalsize\\setlength{{\\tabcolsep}}{{5pt}}
+\\small\\setlength{{\\tabcolsep}}{{3pt}}
 \\begin{{tabular}}{{@{{}}crrrrl@{{}}}}
 \\toprule
 $K$ & 天数 & 总成本/元 & 紧急购电/kWh & 耗时/s & 结论 \\\\
@@ -415,13 +419,13 @@ def export_q3_tables() -> dict:
         return "\n".join(lines)
 
     purchase_tex = build_value_table(
-        f"问题三 {SAMPLE_DATE} 计划购电量 $g^0$（A 边界 + M1\\_M6 主方案）",
+        f"问题三 {SAMPLE_DATE} 计划购电量 $g^0$（A 边界；全时点价值触发策略）",
         "tab:q3-purchase",
         "计划购电量",
         g0_vals,
     )
     adjust_tex = build_value_table(
-        f"问题三 {SAMPLE_DATE} 调整购电量 $g^F$（A 边界 + M1\\_M6 主方案）",
+        f"问题三 {SAMPLE_DATE} 调整购电量 $g^F$（A 边界；全时点价值触发策略）",
         "tab:q3-adjust",
         "调整购电量",
         g_vals,
@@ -468,7 +472,7 @@ def export_q3_tables() -> dict:
         emergency_lines.append(f"{interval} & {fmt_num(amount)} & 紧急购电 \\\\")
     if len(emergency) > 6:
         emergency_lines.append(
-            f"\\multicolumn{{3}}{{c}}{{其余 {len(emergency) - 6} 条记录见 \\texttt{{result3.xlsx}}}} \\\\"
+            f"\\multicolumn{{3}}{{c}}{{其余 {len(emergency) - 6} 条记录见随附正式工作簿}} \\\\"
         )
     emergency_lines.extend(
         [
@@ -488,16 +492,16 @@ def export_q3_tables() -> dict:
     compare_tex = f"""\\begin{{table}}[htbp]
 \\centering
 \\caption{{问题三全年策略比较（A 边界；1--12 月连续运行口径）}}\\label{{tab:q3-strategy-compare}}
-\\normalsize\\setlength{{\\tabcolsep}}{{5pt}}
+\\small\\setlength{{\\tabcolsep}}{{3pt}}
 \\begin{{tabular}}{{@{{}}lrrrrr@{{}}}}
 \\toprule
 策略 & 总成本/元 & 结算成本/元 & 紧急购电/元 & 紧急购电/kWh & 调整次数 \\\\
 \\midrule
-M0（不调整） & {fmt_num(m0.total_cost_yuan, 2)} & {fmt_num(m0.settlement_cost_yuan, 2)} & {fmt_num(m0.emergency_cost_yuan, 2)} & {fmt_num(m0.emergency_kwh, 2)} & {int(m0.adjustment_count)} \\\\
-M1\\_M6（主方案） & {fmt_num(m16.total_cost_yuan, 2)} & {fmt_num(m16.settlement_cost_yuan, 2)} & {fmt_num(m16.emergency_cost_yuan, 2)} & {fmt_num(m16.emergency_kwh, 2)} & {int(m16.adjustment_count)} \\\\
+不调整（M0） & {fmt_num(m0.total_cost_yuan, 2)} & {fmt_num(m0.settlement_cost_yuan, 2)} & {fmt_num(m0.emergency_cost_yuan, 2)} & {fmt_num(m0.emergency_kwh, 2)} & {int(m0.adjustment_count)} \\\\
+全时点调整（M1/M6） & {fmt_num(m16.total_cost_yuan, 2)} & {fmt_num(m16.settlement_cost_yuan, 2)} & {fmt_num(m16.emergency_cost_yuan, 2)} & {fmt_num(m16.emergency_kwh, 2)} & {int(m16.adjustment_count)} \\\\
 \\midrule
 相对 M0 节省 & \\multicolumn{{5}}{{c}}{{{fmt_num(saving, 2)} 元（{fmt_num(saving_pct, 2)}\\%）}} \\\\
-正式 result3 输出区间成本 & \\multicolumn{{5}}{{c}}{{14512748.53 元（2025-02-01 至 2025-12-31，非全年口径）}} \\\\
+2--12 月输出区间成本 & \\multicolumn{{5}}{{c}}{{14512748.53 元（334 日，非全年口径）}} \\\\
 \\bottomrule
 \\end{{tabular}}
 \\end{{table}}
@@ -564,17 +568,22 @@ def export_q2_figures() -> None:
         .sort_values("effective_start_date")
     )
     fig, ax = plt.subplots(figsize=(11.5, 3.8))
+    forecast_labels = {
+        "m1": "历史均值",
+        "m2": "历史中位数",
+        "m3": "近期加权均值",
+    }
     for _, row in selected.iterrows():
         start = pd.Timestamp(row.effective_start_date)
         end = pd.Timestamp(row.effective_end_date) + pd.Timedelta(days=1)
         alpha = "" if pd.isna(row.risk_alpha) else f", α={row.risk_alpha:.2f}"
-        label = f"{row.forecast_mode}{alpha}"
+        label = f"{forecast_labels.get(row.forecast_mode, row.forecast_mode)}{alpha}"
         ax.barh(label, (end - start).days, left=start, height=0.55, color=BLUE, alpha=0.75)
     ax.axvspan(pd.Timestamp("2025-01-01"), pd.Timestamp("2025-02-01"), color=GRAY, alpha=0.12)
     ax.set_xlim(pd.Timestamp("2025-01-01"), pd.Timestamp("2026-01-01"))
     ax.xaxis.set_major_locator(mdates.MonthLocator())
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%m月"))
-    ax.set_title("问题二 C2-R2 冻结预测结构与风险分位日历（$K=8$ 主方案沿用）")
+    ax.set_title("问题二预测结构与风险分位滚动选择日历（$K=8$）")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     save_figure(fig, "fig_q2_policy_calendar", FIG_Q2)
@@ -585,10 +594,17 @@ def export_q3_figures() -> None:
     strategy = pd.read_csv(Q3_STRATEGY)
     subset = strategy[
         (strategy["year_end_boundary"] == "A_q2_aligned")
-        & (strategy["strategy"].isin(["M0", "M1_M6", "M6_only", "M12_only"]))
+        & (strategy["strategy"].isin(["M0", "M1_M6", "M6_only", "M12_only", "M18_only"]))
     ].copy()
     subset = subset.sort_values("total_cost_yuan")
-    labels = subset["strategy"].tolist()
+    label_map = {
+        "M0": "不调整",
+        "M1_M6": "全时点调整",
+        "M6_only": "仅 6:00 更新",
+        "M12_only": "仅 12:00 更新",
+        "M18_only": "仅 18:00 更新",
+    }
+    labels = [label_map[name] for name in subset["strategy"]]
     planned = subset["settlement_cost_yuan"].to_numpy()
     emergency = subset["emergency_cost_yuan"].to_numpy()
     x = np.arange(len(labels))
@@ -597,7 +613,7 @@ def export_q3_figures() -> None:
     ax.bar(x, emergency / 1e6, bottom=planned / 1e6, label="紧急购电成本", color=RED, alpha=0.85)
     ax.set_xticks(x, labels, rotation=15)
     ax.set_ylabel("成本 / 百万元")
-    ax.set_title("问题三 A 边界下各策略全年总成本分解")
+    ax.set_title("问题三 A 边界下各策略总成本分解（2025 年 1--12 月）")
     ax.legend(frameon=False)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
@@ -611,8 +627,8 @@ def export_q3_figures() -> None:
     x = np.arange(len(months))
     width = 0.36
     fig, ax = plt.subplots(figsize=(11.5, 5.0))
-    ax.bar(x - width / 2, m0 / 1e4, width=width, label="M0", color=GRAY)
-    ax.bar(x + width / 2, m16 / 1e4, width=width, label="M1_M6", color=BLUE)
+    ax.bar(x - width / 2, m0 / 1e4, width=width, label="不调整（M0）", color=GRAY)
+    ax.bar(x + width / 2, m16 / 1e4, width=width, label="全时点调整（M1/M6）", color=BLUE)
     ax.set_xticks(x, [m.replace("2025-", "") + "月" for m in months])
     ax.set_ylabel("紧急购电成本 / 万元")
     ax.set_title("问题三 2025 年 2--12 月紧急购电成本月度对比")
@@ -640,7 +656,7 @@ def export_q3_figures() -> None:
     )
     ax.set_xticks(np.arange(len(months_voi)), [m.replace("2025-", "") + "月" for m in months_voi])
     ax.set_ylabel("信息价值 / 万元")
-    ax.set_title("问题三 M1\\_M6 月度已实施调整的信息经济价值（VoI 汇总）")
+    ax.set_title("问题三全时点价值触发策略的月度信息价值（2025 年 2--12 月）")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     save_figure(fig, "fig_q3_update_value", FIG_Q3)

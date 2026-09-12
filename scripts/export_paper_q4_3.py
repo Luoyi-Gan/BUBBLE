@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -83,13 +84,13 @@ def export_tables() -> dict:
     emergency = load_emergency_segments(RESULT43, SAMPLE_DATE)
 
     purchase_tex = build_value_table(
-        f"问题四（Q4-3）{SAMPLE_DATE} 计划购电量 $g^0$（固定 \\texttt{{M1\\_M6}}；交付时段实际价）",
+        f"问题四多时点调整策略（Q4-3）{SAMPLE_DATE} 计划购电量 $g^0$（交付时段实际价）",
         "tab:q4-3-purchase",
         "计划购电量",
         g0_vals,
     )
     adjust_tex = build_value_table(
-        f"问题四（Q4-3）{SAMPLE_DATE} 调整购电量 $g^F$（固定 \\texttt{{M1\\_M6}}；交付时段实际价）",
+        f"问题四多时点调整策略（Q4-3）{SAMPLE_DATE} 调整购电量 $g^F$（交付时段实际价）",
         "tab:q4-3-adjust",
         "调整购电量",
         gf_vals,
@@ -98,7 +99,7 @@ def export_tables() -> dict:
     storage_lines = [
         "\\begin{table}[htbp]",
         "\\centering",
-        f"\\caption{{问题四（Q4-3）{SAMPLE_DATE} 充放电量及日初/日末储电量}}\\label{{tab:q4-3-storage}}",
+        f"\\caption{{问题四多时点调整策略（Q4-3）{SAMPLE_DATE} 充放电量及日初/日末储电量}}\\label{{tab:q4-3-storage}}",
         "\\normalsize\\setlength{\\tabcolsep}{5pt}",
         "\\begin{tabular}{@{}cccccc@{}}",
         "\\toprule",
@@ -125,7 +126,7 @@ def export_tables() -> dict:
     emergency_lines = [
         "\\begin{table}[htbp]",
         "\\centering",
-        f"\\caption{{问题四（Q4-3）{SAMPLE_DATE} 紧急购电记录}}\\label{{tab:q4-3-emergency}}",
+        f"\\caption{{问题四多时点调整策略（Q4-3）{SAMPLE_DATE} 紧急购电记录}}\\label{{tab:q4-3-emergency}}",
         "\\normalsize\\setlength{\\tabcolsep}{6pt}",
         "\\begin{tabular}{@{}ccc@{}}",
         "\\toprule",
@@ -136,7 +137,7 @@ def export_tables() -> dict:
         emergency_lines.append(f"{interval} & {fmt_num(amount)} & 紧急购电 \\\\")
     if len(emergency) > 6:
         emergency_lines.append(
-            f"\\multicolumn{{3}}{{c}}{{其余 {len(emergency) - 6} 条记录见 \\texttt{{result4-3.xlsx}}}} \\\\"
+            f"\\multicolumn{{3}}{{c}}{{其余 {len(emergency) - 6} 条记录见随附正式工作簿}} \\\\"
         )
     emergency_lines.extend(
         [
@@ -151,8 +152,8 @@ def export_tables() -> dict:
 
     cost_tex = f"""\\begin{{table}}[htbp]
 \\centering
-\\caption{{问题四（Q4-3）年度成本分解（固定 \\texttt{{M1\\_M6}}；交付时段实际价结算；2--12 月为题设输出区间）}}\\label{{tab:q4-3-cost-summary}}
-\\normalsize\\setlength{{\\tabcolsep}}{{5pt}}
+\\caption{{问题四多时点调整策略（Q4-3）成本分解（交付时段实际价；2--12 月为题设输出区间）}}\\label{{tab:q4-3-cost-summary}}
+\\small\\setlength{{\\tabcolsep}}{{3pt}}
 \\begin{{tabular}}{{@{{}}lrrrrr@{{}}}}
 \\toprule
 统计口径 & 天数 & 普通购电/元 & 调整费/元 & 紧急购电/元 & 总成本/元 \\\\
@@ -176,18 +177,18 @@ def export_tables() -> dict:
 
     compare_tex = f"""\\begin{{table}}[htbp]
 \\centering
-\\caption{{Q4-3 与 Q3 主方案对照（策略同为 \\texttt{{M1\\_M6}}；价格结算机制不同，不得作同口径优劣排序）}}\\label{{tab:q4-3-mechanism-compare}}
-\\normalsize\\setlength{{\\tabcolsep}}{{4pt}}
+\\caption{{多时点调整策略在固定价与交付价机制下的成本对照}}\\label{{tab:q4-3-mechanism-compare}}
+\\footnotesize\\setlength{{\\tabcolsep}}{{2.5pt}}
 \\begin{{tabular}}{{@{{}}lrrrrr@{{}}}}
 \\toprule
 方案 & 价格机制 & 1--12 月/元 & 2--12 月输出/元 & 紧急购电/元 & 调整次数 \\\\
 \\midrule
-Q3 \\texttt{{M1\\_M6}} & 固定价附件 1 & {fmt_num(Q3_ANNUAL_FIXED, 2)} & {fmt_num(Q3_EXPORT_FIXED, 2)} & {fmt_num(m16.emergency_cost_yuan, 2)} & {int(m16.adjustment_count)} \\\\
-Q4-3 \\texttt{{M1\\_M6}} & 交付时段实际价 & {fmt_num(full.total_cost_yuan, 2)} & {fmt_num(feb.total_cost_yuan, 2)} & {fmt_num(full.emergency_cost_yuan, 2)} & {int(full.adjustment_count)} \\\\
+问题三 & 固定价附件 1 & {fmt_num(Q3_ANNUAL_FIXED, 2)} & {fmt_num(Q3_EXPORT_FIXED, 2)} & {fmt_num(m16.emergency_cost_yuan, 2)} & {int(m16.adjustment_count)} \\\\
+问题四调整策略 & 交付时段实际价 & {fmt_num(full.total_cost_yuan, 2)} & {fmt_num(feb.total_cost_yuan, 2)} & {fmt_num(full.emergency_cost_yuan, 2)} & {int(full.adjustment_count)} \\\\
 \\midrule
 1--12 月机制差 & \\multicolumn{{5}}{{c}}{{{fmt_num(full_delta, 2)} 元（{fmt_num(full_pct, 2)}\\%）；反映价格波动权重，非策略重选收益}} \\\\
 2--12 月输出区间差 & \\multicolumn{{5}}{{c}}{{{fmt_num(export_delta, 2)} 元（{fmt_num(export_pct, 2)}\\%）}} \\\\
-Q4-3 调整费占全年 & \\multicolumn{{5}}{{c}}{{{fmt_num(full.adjustment_cost_yuan, 2)} 元（{fmt_num(adj_share, 2)}\\%）}} \\\\
+问题四调整费占全年 & \\multicolumn{{5}}{{c}}{{{fmt_num(full.adjustment_cost_yuan, 2)} 元（{fmt_num(adj_share, 2)}\\%）}} \\\\
 \\bottomrule
 \\end{{tabular}}
 \\end{{table}}
@@ -220,23 +221,23 @@ def export_figures() -> None:
 
     fig, ax = plt.subplots(figsize=(8.8, 4.2))
     x = range(len(monthly))
-    bottom = monthly["normal_cost_yuan"]
-    ax.bar(x, bottom, label="普通购电（$p g^F$）")
+    bottom = monthly["normal_cost_yuan"] / 1e6
+    ax.bar(x, bottom, label="普通购电费")
     ax.bar(
         x,
-        monthly["adjustment_cost_yuan"],
+        monthly["adjustment_cost_yuan"] / 1e6,
         bottom=bottom,
-        label="调整费（相对 $g^0$）",
+        label="调整费",
     )
     ax.bar(
         x,
-        monthly["emergency_cost_yuan"],
-        bottom=bottom + monthly["adjustment_cost_yuan"],
-        label="紧急购电（$5pe$）",
+        monthly["emergency_cost_yuan"] / 1e6,
+        bottom=bottom + monthly["adjustment_cost_yuan"] / 1e6,
+        label="紧急购电费",
     )
-    ax.set_xticks(list(x), monthly.index, rotation=45, ha="right")
-    ax.set_ylabel("成本 / 元")
-    ax.set_title("Q4-3：2025 年 2--12 月月度购电成本构成")
+    ax.set_xticks(list(x), [m.replace("2025-", "") + "月" for m in monthly.index])
+    ax.set_ylabel("成本 / 百万元")
+    ax.set_title("多时点调整策略月度购电成本构成（2025 年 2--12 月）")
     ax.legend(fontsize=8)
     fig.tight_layout()
     save_figure(fig, "fig_q4_3_monthly_cost", FIGURES)
@@ -247,11 +248,11 @@ def export_figures() -> None:
     q43_vals = [float(full.total_cost_yuan), float(feb_sum.total_cost_yuan)]
     width = 0.35
     fig, ax = plt.subplots(figsize=(7.2, 4.0))
-    ax.bar([i - width / 2 for i in range(2)], q3_vals, width, label="Q3 固定价")
-    ax.bar([i + width / 2 for i in range(2)], q43_vals, width, label="Q4-3 交付价")
+    ax.bar([i - width / 2 for i in range(2)], np.asarray(q3_vals) / 1e6, width, label="问题三固定价")
+    ax.bar([i + width / 2 for i in range(2)], np.asarray(q43_vals) / 1e6, width, label="问题四交付价")
     ax.set_xticks([0, 1], labels)
-    ax.set_ylabel("总成本 / 元")
-    ax.set_title("Q4-3 与 Q3：同策略、不同价格机制")
+    ax.set_ylabel("总成本 / 百万元")
+    ax.set_title("多时点调整策略：同一策略、不同价格机制")
     ax.legend()
     fig.tight_layout()
     save_figure(fig, "fig_q4_3_mechanism_compare", FIGURES)

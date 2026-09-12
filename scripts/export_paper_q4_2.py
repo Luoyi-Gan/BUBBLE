@@ -36,23 +36,24 @@ TABLES = ROOT / "paper" / "manuscript" / "tables" / "q4"
 FIGURES = ROOT / "paper" / "overleaf" / "figures" / "q4"
 
 
-def load_cost_slices() -> tuple[pd.Series, pd.Series]:
+def load_cost_slices() -> tuple[pd.Series, pd.Series, float]:
     daily = pd.read_csv(WARMUP)
     daily["date"] = pd.to_datetime(daily["date"])
     jan = daily[daily["date"].dt.month == 1]
     feb_dec = daily[(daily["date"] >= "2025-02-01") & (daily["date"] <= "2025-12-31")]
-    return jan.sum(numeric_only=True), feb_dec.sum(numeric_only=True)
+    feb1_soc = float(feb_dec.iloc[0]["soc_start_kwh"])
+    return jan.sum(numeric_only=True), feb_dec.sum(numeric_only=True), feb1_soc
 
 
 def export_tables() -> dict:
     TABLES.mkdir(parents=True, exist_ok=True)
-    jan, feb = load_cost_slices()
+    jan, feb, feb1_soc = load_cost_slices()
     meta = json.loads(META.read_text(encoding="utf-8"))
     k_meta = json.loads(K_REVIEW.read_text(encoding="utf-8"))
     k_rows = []
     for k in k_meta["k_candidates"]:
         row = k_meta["by_k"][str(k)]
-        conclusion = latex_code("retain_k8_stable" if k == k_meta["decision"]["keep_k"] else "review_only")
+        conclusion = "主方案" if k == k_meta["decision"]["keep_k"] else "对照"
         k_rows.append(
             f"$K={k}$ & {int(row['n_windows'])} & "
             f"{fmt_num(row['total_cost_yuan'], 2)} & "
@@ -64,7 +65,7 @@ def export_tables() -> dict:
 
     purchase_rows = [(slot, fmt_num(purchase_vals[slot])) for slot in SAMPLE_SLOTS]
     purchase_tex = render_triplet_table(
-        f"问题四（Q4-2）{SAMPLE_DATE} 计划购电量及全天汇总（波动电价；$K=8$）",
+        f"问题四日前额度策略（Q4-2）{SAMPLE_DATE} 计划购电量及全天汇总（$K=8$）",
         "tab:q4-purchase",
         "购电量",
         purchase_rows,
@@ -74,7 +75,7 @@ def export_tables() -> dict:
     storage_lines = [
         "\\begin{table}[htbp]",
         "\\centering",
-        f"\\caption{{问题四（Q4-2）{SAMPLE_DATE} 充放电量及日初/日末储电量}}\\label{{tab:q4-storage}}",
+        f"\\caption{{问题四日前额度策略（Q4-2）{SAMPLE_DATE} 充放电量及日初/日末储电量}}\\label{{tab:q4-storage}}",
         "\\normalsize\\setlength{\\tabcolsep}{5pt}",
         "\\begin{tabular}{@{}cccccc@{}}",
         "\\toprule",
@@ -100,7 +101,7 @@ def export_tables() -> dict:
 
     cost_tex = f"""\\begin{{table}}[htbp]
 \\centering
-\\caption{{问题四（Q4-2）年度成本分解（交付时段实际价结算；2--12 月为题设输出区间）}}\\label{{tab:q4-cost-summary}}
+\\caption{{问题四日前额度策略（Q4-2）成本分解（交付时段实际价；2--12 月为题设输出区间）}}\\label{{tab:q4-cost-summary}}
 \\normalsize\\setlength{{\\tabcolsep}}{{6pt}}
 \\begin{{tabular}}{{@{{}}lrrrr@{{}}}}
 \\toprule
@@ -110,7 +111,7 @@ def export_tables() -> dict:
 2--12 月正式输出 & 334 & {fmt_num(feb.normal_cost_yuan, 2)} & {fmt_num(feb.emergency_cost_yuan, 2)} & {fmt_num(feb.total_cost_yuan, 2)} \\\\
 \\midrule
 2--12 月紧急购电量/kWh & \\multicolumn{{4}}{{c}}{{{fmt_num(feb.emergency_kwh, 2)}}} \\\\
-2 月 1 日继承 SOC/kWh & \\multicolumn{{4}}{{c}}{{{fmt_num(feb.soc_start_kwh, 4)}}} \\\\
+2 月 1 日继承 SOC/kWh & \\multicolumn{{4}}{{c}}{{{fmt_num(feb1_soc, 4)}}} \\\\
 \\bottomrule
 \\end{{tabular}}
 \\end{{table}}
@@ -118,7 +119,7 @@ def export_tables() -> dict:
 
     param_tex = f"""\\begin{{table}}[htbp]
 \\centering
-\\caption{{问题四（Q4-2）情景数 $K$ 的闭环复核（与正式部署同一 $\\alpha$ 校准协议）}}\\label{{tab:q4-parameter}}
+\\caption{{问题四日前额度策略（Q4-2）情景数 $K$ 的闭环复核}}\\label{{tab:q4-parameter}}
 \\normalsize\\setlength{{\\tabcolsep}}{{5pt}}
 \\begin{{tabular}}{{@{{}}crrrrl@{{}}}}
 \\toprule
@@ -139,7 +140,7 @@ $K$ & 窗口数 & 验证总成本/元 & 验证紧急费/元 & 平均耗时/s & �
         )
     price_tex = f"""\\begin{{table}}[htbp]
 \\centering
-\\caption{{Q4-2 价格预测误差（逐月；单位：元/kWh）}}\\label{{tab:q4-price-error}}
+\\caption{{问题四因果价格预测误差（2025 年 1--12 月；单位：元/kWh）}}\\label{{tab:q4-price-error}}
 \\normalsize\\setlength{{\\tabcolsep}}{{6pt}}
 \\begin{{tabular}}{{@{{}}lrrr@{{}}}}
 \\toprule
@@ -176,11 +177,16 @@ def export_figures() -> None:
 
     fig, ax = plt.subplots(figsize=(8.5, 4.2))
     x = range(len(monthly))
-    ax.bar(x, monthly["normal_cost_yuan"], label="计划购电（按 $pq$）")
-    ax.bar(x, monthly["emergency_cost_yuan"], bottom=monthly["normal_cost_yuan"], label="紧急购电（按 $5pe$）")
-    ax.set_xticks(list(x), monthly.index, rotation=45, ha="right")
-    ax.set_ylabel("成本 / 元")
-    ax.set_title("Q4-2：2025 年 2--12 月月度购电成本构成")
+    ax.bar(x, monthly["normal_cost_yuan"] / 1e6, label="计划购电费")
+    ax.bar(
+        x,
+        monthly["emergency_cost_yuan"] / 1e6,
+        bottom=monthly["normal_cost_yuan"] / 1e6,
+        label="紧急购电费",
+    )
+    ax.set_xticks(list(x), [m.replace("2025-", "") + "月" for m in monthly.index])
+    ax.set_ylabel("成本 / 百万元")
+    ax.set_title("日前额度策略月度购电成本构成（2025 年 2--12 月）")
     ax.legend()
     fig.tight_layout()
     save_figure(fig, "fig_q4_monthly_cost", FIGURES)
@@ -188,11 +194,12 @@ def export_figures() -> None:
     price = pd.read_csv(PRICE_MONTHLY)
     price = price[price["year_month"] != "2025-annual"]
     fig, ax = plt.subplots(figsize=(8.5, 4.0))
-    ax.plot(price["year_month"], price["day_ahead_mae"], marker="o", label="日初 MAE")
-    ax.plot(price["year_month"], price["mpc_remaining_mae_mean"], marker="s", label="日内剩余 MAE均值")
+    month_labels = [m.replace("2025-", "") + "月" for m in price["year_month"]]
+    ax.plot(month_labels, price["day_ahead_mae"], marker="o", label="日初 MAE")
+    ax.plot(month_labels, price["mpc_remaining_mae_mean"], marker="s", label="日内剩余 MAE 均值")
     ax.set_ylabel("误差 / 元·kWh$^{-1}$")
-    ax.set_title("Q4-2：价格预测误差（逐月）")
-    ax.tick_params(axis="x", rotation=45)
+    ax.set_title("因果价格预测误差（2025 年 1--12 月）")
+    ax.tick_params(axis="x", rotation=0)
     ax.legend()
     fig.tight_layout()
     save_figure(fig, "fig_q4_price_error", FIGURES)

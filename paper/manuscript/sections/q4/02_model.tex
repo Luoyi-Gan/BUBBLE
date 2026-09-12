@@ -28,7 +28,7 @@ z_{d,\tau}=\frac1{\tau}\sum_{s=1}^{\tau}\left(p_{d,s}-\widehat p^0_{d,s}\right)
 
 负荷与光伏预测完全继承 Q2/Q3 主口径：负荷为最近至多四个同星期历史日均值；Q4-2 光伏沿用 Q2 因果基准与后验残差更新；Q4-3 在 0:00、6:00、12:00、18:00 使用附件 3 当次预报，并以更新时点已观测光伏为锚点做线性插值。
 
-\subsubsection{Q4-2：三元联合残差与日前—日内分工}
+\subsubsection{日前额度策略：三元联合残差与日前—日内分工}
 
 对历史日 $j<d$，在当日可得预测存档下构造三元残差
 \begin{equation}
@@ -38,8 +38,8 @@ z_{d,\tau}=\frac1{\tau}\sum_{s=1}^{\tau}\left(p_{d,s}-\widehat p^0_{d,s}\right)
 \end{equation}
 在最近至多 28 个完整残差日上，以标准化欧氏距离做 PAM/K-medoids，取 $K=8$ 条代表路径，概率为簇占比。第 $k$ 条路径给出
 \begin{equation}
-L^{(k)}_{d,t}=\max(0,\widehat L_{d,t}+r^L_{m_k,t}),
-P^{(k)}_{d,t}=\max(0,\widehat P_{d,t}+r^P_{m_k,t}),
+L^{(k)}_{d,t}=\max(0,\widehat L_{d,t}+r^L_{m_k,t}),\quad
+P^{(k)}_{d,t}=\max(0,\widehat P_{d,t}+r^P_{m_k,t}),\quad
 p^{(k)}_{d,t}=\max(0,\widehat p^0_{d,t}+r^p_{m_k,t}).
 \label{eq:q4-scenario-path}
 \end{equation}
@@ -61,9 +61,9 @@ C^{4\text{-}2}_d=\sum_t\left(p_{d,t}q_{d,t}+5p_{d,t}e_{d,t}\right).
 \end{equation}
 只有式\eqref{eq:q4-2-actual-cost}用于结论，日前情景目标不得替代实际账单。
 
-\subsubsection{Q4-3：固定 \texttt{M1\_M6} 与价值触发调整}
+\subsubsection{多时点调整策略：沿用全时点价值触发规则}
 
-Q4-3 不重新选择 Q3 策略，固定 \texttt{M1\_M6}。0:00 以 $(\widehat L,\widehat P^0,\widehat p^0)$ 求 $g^0$ 与储能预案；在 $\tau\in\{6{:}00,12{:}00,18{:}00\}$，对未执行时段分别计算固定承诺与自由调整的两个剩余时域最优值 $J^{\mathrm{fix}}_\tau,J^{\mathrm{free}}_\tau$，令 $VoI_\tau=J^{\mathrm{fix}}_\tau-J^{\mathrm{free}}_\tau$。仅当 $VoI_\tau$ 超过求解器货币容差时才采用自由解。预测阶段使用 $\widehat p_{d,t\mid\tau}$ 与式\eqref{eq:q4-settlement} 的预测结算函数；实现阶段按实际 $p_{d,t}$ 重算
+多时点调整策略不重新选择问题三的策略，而是沿用全时点价值触发策略（M1/M6）。0:00 以 $(\widehat L,\widehat P^0,\widehat p^0)$ 求 $g^0$ 与储能预案；在 $\tau\in\{6{:}00,12{:}00,18{:}00\}$，对未执行时段分别计算固定承诺与自由调整的两个剩余时域最优值 $J^{\mathrm{fix}}_\tau,J^{\mathrm{free}}_\tau$，令 $VoI_\tau=J^{\mathrm{fix}}_\tau-J^{\mathrm{free}}_\tau$。仅当 $VoI_\tau$ 超过求解器货币容差时才采用自由解。预测阶段使用 $\widehat p_{d,t\mid\tau}$ 与式\eqref{eq:q4-settlement} 的预测结算函数；实现阶段按实际 $p_{d,t}$ 重算
 \begin{equation}
 C^{4\text{-}3}_d=\sum_t\left[\phi_{d,t}(g^0_{d,t},g^F_{d,t})+5p_{d,t}e_{d,t}\right].
 \label{eq:q4-3-actual-cost}
