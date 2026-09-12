@@ -13,23 +13,25 @@
 
 ## 平时改哪个文件
 
+正文 `.tex` 统一放在 **`../manuscript/`**（仅含 `sections/` 与 `tables/` 的论文组成文件）；`preamble.tex` 通过 `\input@path` 引用该目录，因此 `\input{sections/...}` 与 `\input{tables/...}` 路径不变。Overleaf 上传时需保证项目内能访问到 `manuscript/`（建议以 `paper/` 为项目根，主文件选 `overleaf/main.tex`）。
+
 - 全文入口：`main.tex`，一般不用改。
 - 章节接入状态：`assembly.tex`，只在相应内容审核完成后切换 Ready 开关。
 - 共同版式：`paper_layout.sty`；沿用原类文件和样式，统一 A4 四边25mm、正文12pt、1.35倍行距、2字符首行缩进、一级居中黑体中文编号。
-- 问题背景与重述：`sections/restatement/background.tex`、`q1.tex`、`q2.tex`、`q3.tex`、`q4.tex`。
-- 假设：`sections/q1/00_assumptions.tex`，全篇入口为 `sections/02_assumptions.tex`。
-- 符号：`sections/q1/00_notation.tex`，全篇入口为 `sections/03_notation.tex`。
-- Q1 问题分析：`sections/q1/01_analysis.tex`。
-- Q1 模型建立：`sections/q1/02_model.tex`。
-- Q1 模型求解：`sections/q1/03_solution.tex`。
-- Q1 成本下界：`sections/q1/04_bounds.tex`。
-- Q1 结果分析：`sections/q1/05_results.tex`。
-- Q1 可行性与稳健性：`sections/q1/06_validation.tex`。
-- Q2/Q3/Q4：分别进入 `sections/q2/`、`sections/q3/`、`sections/q4/`，同样按分析、模型、求解、结果、检验逐文件填写；Q3 已接入问题分析、假设、模型建立与求解。
-- 结果表：`tables/q1/purchase.tex`、`storage.tex`，按题目正文表1/表2；`plan_appendix.tex` 为完整明细。
+- 问题背景与重述：`../manuscript/sections/restatement/background.tex`、`q1.tex`、`q2.tex`、`q3.tex`、`q4.tex`。
+- 假设：`../manuscript/sections/q1/00_assumptions.tex`，全篇入口为 `../manuscript/sections/02_assumptions.tex`。
+- 符号：`../manuscript/sections/q1/00_notation.tex`，全篇入口为 `../manuscript/sections/03_notation.tex`。
+- Q1 问题分析：`../manuscript/sections/q1/01_analysis.tex`。
+- Q1 模型建立：`../manuscript/sections/q1/02_model.tex`。
+- Q1 模型求解：`../manuscript/sections/q1/03_solution.tex`。
+- Q1 成本下界：`../manuscript/sections/q1/04_bounds.tex`。
+- Q1 结果分析：`../manuscript/sections/q1/05_results.tex`。
+- Q1 可行性与稳健性：`../manuscript/sections/q1/06_validation.tex`。
+- Q2/Q3/Q4：分别进入 `../manuscript/sections/q2/`、`q3/`、`q4/`，同样按分析、模型、求解、结果、检验逐文件填写；Q3 已接入问题分析、假设、模型建立与求解。
+- 结果表：`../manuscript/tables/q1/purchase.tex`、`storage.tex`，按题目正文表1/表2；`plan_appendix.tex` 为完整明细。
 - 图片：`figures/q1/`；各问分别建文件夹，使用相对路径。
-- 摘要：`sections/00_abstract.tex`；全篇评价：`sections/06_evaluation.tex`。
-- 参考文献：`sections/07_references.tex`；附录：`sections/08_appendix.tex`；AI使用声明：`sections/09_ai_statement.tex`。
+- 摘要：`../manuscript/sections/00_abstract.tex`；全篇评价：`../manuscript/sections/06_evaluation.tex`。
+- 参考文献：`../manuscript/sections/07_references.tex`；附录：`../manuscript/sections/08_appendix.tex`；AI使用声明：`../manuscript/sections/09_ai_statement.tex`。
 
 修改某个 tex 中的具体句子后，保存并重新编译。不要把子文件中的内容再复制进 main.tex。不要在内容子文件增加 documentclass 或 begin/end document。
 
@@ -37,7 +39,7 @@
 
 1. 在 **Main document** 中临时选择 `review_restatement.tex`、`review_q1.tex` 或 `review_q1_analysis.tex` / `review_q1_model.tex` / `review_q1_solution.tex` / `review_q1_results.tex`。
 2. 点击 Recompile，下载该部分 PDF 进行审核；正文与 main.tex 引用同一组内容文件。
-3. 修改仍在 sections/ 或 tables/ 中进行，不直接编辑 PDF，也不复制一份正文到 review 入口。
+3. 修改仍在 `../manuscript/sections/` 或 `../manuscript/tables/` 中进行，不直接编辑 PDF，也不复制一份正文到 review 入口。
 4. 看全文时，把 Main document 切回 `main.tex`。
 5. Q2—Q4 已预建 `review_q2.tex`、`review_q3.tex`、`review_q4.tex`；当前只是空框架，填入各问文件后使用。
 

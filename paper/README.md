@@ -5,6 +5,7 @@
 - `outline.md` 章节大纲
 - `COMPLETION_PLAN.md`：当前缺口、分工、验收门与交稿清单
 - 导出的 PDF 备份（可选，注意体积）
-- `overleaf/`：可独立编译的 LaTeX、图表、数据、样式、写作计划及当前 PDF 快照
+- `manuscript/`：**仅含 `.tex` 的论文正文组成**（`sections/` 与 `tables/`），不含流程说明、图表或编译入口
+- `overleaf/`：可独立编译的 LaTeX 工程（入口、样式、图表、数据、审核稿及当前 PDF 快照）；正文 `.tex` 通过 `preamble.tex` 中的 `\input@path` 引用 `../manuscript/`
 
 不提交可由 XeLaTeX 重建的 `.aux`、`.log`、`.out` 缓存；`overleaf/main.pdf` 是本次同步后的可审阅快照。
