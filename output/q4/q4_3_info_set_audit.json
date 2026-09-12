@@ -1,0 +1,27 @@
+{
+  "days": [
+    {
+      "date": "2025-02-01",
+      "tau_perturbed": 40,
+      "q42_q_max_abs_diff_kwh": 2.2737367544323206e-13,
+      "q42_prefix_max_abs_diff": 2.2737367544323206e-13,
+      "q43_g0_max_abs_diff_kwh": 2.2737367544323206e-13,
+      "q43_prefix_max_abs_diff": 2.2737367544323206e-13,
+      "q42_pass": true,
+      "q43_pass": true,
+      "pass": true
+    },
+    {
+      "date": "2025-06-21",
+      "tau_perturbed": 40,
+      "q42_q_max_abs_diff_kwh": 2.2737367544323206e-13,
+      "q42_prefix_max_abs_diff": 2.2737367544323206e-13,
+      "q43_g0_max_abs_diff_kwh": 5.684341886080802e-14,
+      "q43_prefix_max_abs_diff": 5.684341886080802e-14,
+      "q42_pass": true,
+      "q43_pass": true,
+      "pass": true
+    }
+  ],
+  "all_pass": true
+}

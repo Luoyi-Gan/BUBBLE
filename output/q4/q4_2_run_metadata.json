@@ -1,0 +1,23 @@
+{
+  "git_commit": "652cf8750e624a2ced2eed477f43da708ba3ccdd",
+  "system": "q4_2",
+  "full_year": true,
+  "n_days": 365,
+  "annual_cost_yuan": 17680437.930237956,
+  "soc_continuity": {
+    "n_days": 365,
+    "max_soc_gap_kwh": 0.0,
+    "pass": true
+  },
+  "n_days_pass": 365,
+  "end_soc": 1200.0,
+  "pam_seed": 0,
+  "load_information_case": "causal_load_main",
+  "settlement_rule": "delivery_time_actual_price",
+  "elapsed_seconds": 2225.878171479002,
+  "wrote_result4_xlsx": true,
+  "two_day_costs": {
+    "2025-02-01": 19757.45854298777,
+    "2025-06-21": 22322.36098095029
+  }
+}

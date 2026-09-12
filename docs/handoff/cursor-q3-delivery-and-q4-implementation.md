@@ -1,6 +1,6 @@
 # Cursor 交接单：Q3 正式导出与 Q4 实现
 
-**交接状态：** 可立即实施。
+**交接状态：** P0（Q3 `result3.xlsx`）和 P1（Q4 因果价格预测）已验收；Cursor 当前只实施 P2 的 Q4-2 与 Q4-3，先两日回归、后全年。
 
 **职责边界：** Cursor 负责代码、重跑、Excel、图和输出审计；Codex 已冻结模型口径，不改写求解代码。
 **禁止事项：** 不重跑 Q3 的全部 10 条年度路径，不重新选择 Q3 策略或年末 SOC，不在 Q4 中读取当天未来实际价格。
@@ -23,7 +23,7 @@ Cursor 已推送年度归档 `6e16b3a`；Codex 在独立工作树运行了 `q3.t
 
 年度主结果为：总成本 16,373,508.75 元；相对 M0 低 736,059.50 元（4.30%）。年末 6000 kWh 的 B 路径不改变策略排序，并使 `M1_M6` 成本增加 2262.88 元，故只保留为已完成的边界敏感性。
 
-## 2. P0：生成题设格式 `output/result3.xlsx`
+## 2. P0：生成题设格式 `output/result3.xlsx`（已完成，禁止重跑）
 
 ### 2.1 为什么必须补跑一条主路径
 
@@ -70,7 +70,7 @@ locked_or_mutable, last_update_time
 5. 用 Excel 重新打开后检查四张表无 `#REF!`、日期/数值未变成文本、标题未截断；保存 `output/result3.xlsx`。
 6. 导出后运行已有物理审计，并增加 `result3_export_audit.json`：行数、日期覆盖、时段覆盖、逐日汇总差、异常值与文件路径。
 
-## 3. P1：Q4 价格预测器（先完成，不触发储能年度重跑）
+## 3. P1：Q4 价格预测器（已完成，作为 P2 唯一价格输入）
 
 唯一规格来源为 `docs/specs/q4.md`（commit `3d3359e`）。先实现并验证纯价格模块，以避免把价格信息泄漏混入优化器后难以排查。
 
@@ -92,23 +92,80 @@ locked_or_mutable, last_update_time
 output/q4/q4_price_forecast_audit.csv
 ```
 
-至少包括计划日、每个时点的训练截止日、候选 MAE、在线选中模型、预测 MAE/RMSE、是否使用回退。对未来价格扰动时，日初预测与已作出决策必须不变。
+至少包括计划日、每个时点的训练截止日、候选 MAE、在线选中模型、预测 MAE/RMSE、是否使用回退。对未来价格扰动时，日初预测与已作出决策必须不变。已交付价格审计、两日回归记录和未来价格扰动审计；P2 必须复用该模块，不能另写全知价格序列。
 
 ## 4. P2：Q4-2 与 Q4-3 实现顺序
 
-### Q4-2
+**本节是 Cursor 当前唯一的实现任务。** 已验收的 Q3 正式表和 Q4 价格模块均不得重写；Q4 代码只能调用已提交的因果价格预测器。先完成两个指定回归日的端到端验证，验收通过后再跑全年。除运行产物外，任何阶段都不得修改 `docs/specs/q4.md` 所冻结的模型口径。
 
-1. 保持 Q2 的 (q) 日初锁定、(x\le q)、紧急购电、公共母线和跨日 SOC；
-2. 用同一历史日配对的 (r^L,r^P,r^p) 构造 K=8 三元 medoid 路径，不能独立抽样；
-3. 路径内储能变量只做 (q) 的日前评估；真实执行使用因果 MPC，不能执行完整情景已知未来的轨迹；
-4. 实现成本严格为 \(\sum_t[p_{d,t}q_{d,t}+5p_{d,t}e_{d,t}]\)。
+### 4.1 共同的工程边界
 
-### Q4-3
+1. 所有新模块放入 `q4/`，不得复制一份附件数据或把实际未来价格写入中间输入。每个计划日都由 `q4.price_forecast.fit_causal_price_forecasts` 提供该日可用的日初价格基准和日内价格前缀修正。
+2. 10 分钟执行明细是唯一可用于成本、物理约束和 Excel 导出的事实源。每日汇总只能从该明细聚合，不能以日总成本反推调度。
+3. 每条执行明细至少保留 `date, period_index, q_or_g0_kwh, g_final_kwh, x_kwh, emergency_kwh, charge_kwh, discharge_kwh, curtailment_kwh, soc_start_kwh, soc_end_kwh, actual_load_kwh, actual_pv_kwh, actual_price, price_forecast_used, last_update_time, balance_residual_kwh`。Q4-2 中 `g_final_kwh` 可为空但 `q_or_g0_kwh=q`；Q4-3 中 `q_or_g0_kwh=g^0` 且必须写出最终 `g^F`。
+4. 每个输出都须标明 `load_information_case=causal_load_main`、Q4-2 继承 Q2 的年末 SOC 规则、Q4-3 为 `A_q2_aligned / 1200 kWh`、价格结算为 delivery-time actual price。不得把 oracle、两日试验或旧 Q2/Q3 成本写为 Q4 年度主结果。
+5. 主程序允许流式逐日写出 CSV，禁止在内存中累计全年 CVXPY 模型。随机步骤（例如 medoid 初始点）必须固定种子并写入元数据。
 
-1. 固定采用 Q3 主策略 `M1_M6`，不因查看 Q4 实现成本重新挑选 M0/M6/M12/M18；
-2. 0:00 制定 (g^0)，6/12/18 点仅调整未来 (g)，并用价格前缀更新后的 \(\widehat p_{t\mid\tau}\) 计算预测成本；
-3. 预测调整成本采用 \(\widehat\phi=\widehat p g+0.5\widehat p|g-g^0|\)，实际账单采用 \(\phi=p g+0.5p|g-g^0|\)；
-4. 不引入 CVaR 权重、价格 oracle、日前锁价、售电、需求响应或电池折旧成本。
+### 4.2 Q4-2：波动价格下的日前额度—因果 MPC
+
+#### A. 实现内容
+
+1. **日前层。** 对每个日 `d`，只从严格早于 `d` 且三元残差完整的日子取最近至多 28 日候选池。残差必须对应各历史日当时存档的因果负荷、光伏和价格预测，按同一历史日配对成 `(rL,rP,rp)`；使用规格第 5.1 节的 MAD/标准差回退标准化与 K-medoids，目标 `K=8`。历史不足 8 条时使用全部可得 medoid，并在审计中记录 `K_effective`，不得补造情景。
+2. **日前承诺。** 在每个代表路径中建立 Q2 的公共母线、SOC、弃光、紧急电和 `0<=x<=q` 约束，决策得到一条全日共享、非负、144 维 `q`。路径内充放电仅用于比较候选 `q`，不得直接用于当天执行。成本项必须是 `sum(p^(k)*q + 5*p^(k)*e^(k))` 加既有 48 小时到达项。
+3. **风险储备。** 仅按此前至多 14 个已结束日的实际执行成本选择 `alpha∈{0.60,0.70,0.80,0.90}`，并记录候选值、可用样本、选中值与平局规则。任何日不得以当天或以后实际成本选 `alpha`；历史不足时采用 Q2 已有的最小可得回退，并显式记录。
+4. **执行层。** `q` 在当日全程不变。每十分钟末仅用已结束的价格、负荷、光伏及 SOC 重算下一步 MPC；剩余价格由已验收价格模块给出，负荷/光伏保持 Q2 因果口径。实际能量平衡使用当期已揭示 `(L,P)`；未来只用条件预测。只执行下一动作，随后滚动。普通购电成本按 `p*q` 结算，不得因 `x<q` 把已锁定额度成本删去；紧急电成本为 `5*p*e`。
+
+#### B. 先交付两日回归，再交付全年
+
+先为 `2025-02-01` 与 `2025-06-21` 输出：日前候选池/medoid/概率、`K_effective`、`alpha` 选择过程、144 行执行明细、逐项账本和物理审计。两日验收通过后才运行 365 日，并输出：
+
+```text
+output/q4/q4_2_day_ahead_audit.csv
+output/q4/q4_2_scenario_audit.csv
+output/q4/q4_2_dispatch_daily/dispatch_YYYY-MM-DD.csv
+output/q4/q4_2_cost_ledger.csv
+output/q4/q4_2_physical_audit.json
+output/q4/q4_2_run_metadata.json
+output/result4-2.xlsx
+```
+
+### 4.3 Q4-3：固定 M1_M6 的价格感知调整承诺
+
+#### A. 实现内容
+
+1. **策略固定。** 只实现 Q3 已选定的 `M1_M6`：每日 0:00 用当时因果的负荷、光伏、价格预测和日初 SOC 制定 144 维 `g0`；在 6:00、12:00、18:00 三个节点评估是否修改尚未执行的承诺。不得重新跑 M0/M6/M12/M18/M1 或按 Q4 成本重新选策略。
+2. **锁定规则。** 时点 `tau` 的更新只影响 `t>tau` 的承诺，从 `tau+1` 的 10 分钟开始生效；已执行前缀必须与该时点前的有效版本逐项相同。每次更新须写出旧版本、新版本、受影响时段、触发时点与所用预测版本。
+3. **预测层与执行层。** 预测调整目标使用当时可得的 `p_hat[t|tau]`，实际逐时段物理执行仍只在该时段结束后获得真实 `(L,P,p)`。普通购电可取用量满足 `0<=x<=gF`；电池、弃光、紧急购电、SOC 和公共母线约束完全沿用 Q3/Q4 规格。不得把未来实际价格作为调整触发、代价系数或优化输入。
+4. **成本账本。** 每个时段普通承诺及调整项按实际交付价格结算：`p*gF + 0.5*p*abs(gF-g0)`；另加 `5*p*e`。账本必须分别展示 normal、adjustment 和 emergency 三项，且可由 10 分钟明细逐项复算。取消量不得被重复计收，多个更新也只能相对原始 `g0` 计一次调整费。
+
+#### B. 先交付两日回归，再交付全年
+
+对同一两日先给出 `g0`、0/1/2/3 次实际更新日志、144 行最终执行轨迹、预测目标与实际结算账本、前缀锁定审计和物理审计。通过后运行 365 日，输出：
+
+```text
+output/q4/q4_3_update_log.csv
+output/q4/q4_3_dispatch_daily/dispatch_YYYY-MM-DD.csv
+output/q4/q4_3_cost_ledger.csv
+output/q4/q4_3_physical_audit.json
+output/q4/q4_3_run_metadata.json
+output/result4-3.xlsx
+```
+
+### 4.4 不可省略的验收与提交条件
+
+在将任何全年成本写入论文或 Excel 前，必须全部满足以下条件：
+
+| 验收项 | Q4-2 | Q4-3 |
+| --- | --- | --- |
+| 信息集 | 扰动当前日未结束价格及未来日价格后，日初 `q` 与已执行动作不变；价格、负荷、光伏训练日期均早于计划日 | 同左；并且每次调整前缀 `gF` 与旧版本完全一致 |
+| 物理约束 | 每时段能量平衡残差、SOC 上下界、SOC 跨日连续性、功率上限、弃光界、`x<=q`、不同时充放电均通过 | 同左，且 `x<=gF` |
+| 经济账本 | 每天 `sum(p*q+5*p*e)` 与明细账本一致；全年总和等于每日总和 | 每天 `sum(p*gF+0.5*p*abs(gF-g0)+5*p*e)` 与账本一致；无取消量重复收费 |
+| 情景/策略可追溯 | 每日候选池截止日、medoid 日期、概率、`K_effective`、`alpha` 的历史样本与选择结果可复核 | 每日 `g0`、每次更新的时点/预测版本/受影响时段/有效 `gF` 可复核 |
+| 题设表 | `result4-2.xlsx` 按附件模板、数值和日期为 Excel 原生类型，结果与执行明细一致 | `result4-3.xlsx` 同左，且计划/调整列分别来自 `g0/gF` |
+
+必须新增自动化测试，至少覆盖：价格预测和日内价格修正不受未来价格扰动影响；Q4-2 的 `q` 在当日不变；Q4-3 在 6/12/18 点前缀锁定；两种账本独立重算一致；一次电池上界、下界和紧急购电的边界样例。运行完整的 Q2、Q3、Q4 既有测试，保存命令和结果摘要到 `run_metadata`，不得以“生成成功”代替测试。
+
+提交顺序固定为：**(i)** 代码与两日回归/审计，**(ii)** 两日验收修复，**(iii)** 全年流式运行与 `result4-2.xlsx`、`result4-3.xlsx`，**(iv)** 物理、账本、信息集审计及图。每阶段单独提交，全年运行前先告知 AI 队长和 Codex。
 
 ## 5. Q4 输出与统一验收
 
@@ -118,8 +175,13 @@ output/q4/q4_price_forecast_audit.csv
 output/result4-2.xlsx
 output/result4-3.xlsx
 output/q4/q4_price_forecast_audit.csv
-output/q4/q4_cost_ledger.csv
-output/q4/q4_physical_audit.json
+output/q4/q4_2_day_ahead_audit.csv
+output/q4/q4_2_scenario_audit.csv
+output/q4/q4_2_cost_ledger.csv
+output/q4/q4_2_physical_audit.json
+output/q4/q4_3_update_log.csv
+output/q4/q4_3_cost_ledger.csv
+output/q4/q4_3_physical_audit.json
 ```
 
 先提交价格审计和两日回归输出，再启动全年 Q4 计算。全年结果通过后才生成图。所有主结论仅引用实际结算成本；预测目标、情景评估目标、oracle 和敏感性必须分别标注。
@@ -130,3 +192,18 @@ output/q4/q4_physical_audit.json
 2. 提交 Q4 价格模块、单元测试、价格审计和两个既有试点日回归；
 3. 提交 Q4 全年输出、物理审计和图；
 4. 每一步独立 commit；不得覆盖已验收 Q1/Q2/Q3 年度归档。
+
+## 7. 未完成但不得误报的 Q3 年度敏感性
+
+`linear_anchor_main × anchor_final_main` 是当前唯一全年主口径。现有映射与结算敏感性只覆盖两个回归日期，不能推出全年策略排序稳定。
+
+若时间允许，年度附录任务应运行以下四个组合、每个组合均覆盖五个策略并统一采用 A / 1200 kWh：
+
+```text
+linear_anchor_main × anchor_final_main       # 已完成主口径
+linear_anchor_main × adjacent_literal_sensitivity
+step_hourly_sensitivity × anchor_final_main
+step_hourly_sensitivity × adjacent_literal_sensitivity
+```
+
+输出每种组合的策略总成本、紧急购电、弃光与排序。该任务不阻塞已签收的主策略比较，也不允许在未运行前把“两日结果”写成年份稳健性结论。

@@ -1,0 +1,9 @@
+{
+  "soc_continuity": {
+    "n_days": 365,
+    "max_soc_gap_kwh": 0.0,
+    "pass": true
+  },
+  "n_days": 365,
+  "n_days_pass": 365
+}
