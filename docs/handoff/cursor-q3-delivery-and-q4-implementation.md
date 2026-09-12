@@ -130,3 +130,18 @@ output/q4/q4_physical_audit.json
 2. 提交 Q4 价格模块、单元测试、价格审计和两个既有试点日回归；
 3. 提交 Q4 全年输出、物理审计和图；
 4. 每一步独立 commit；不得覆盖已验收 Q1/Q2/Q3 年度归档。
+
+## 7. 未完成但不得误报的 Q3 年度敏感性
+
+`linear_anchor_main × anchor_final_main` 是当前唯一全年主口径。现有映射与结算敏感性只覆盖两个回归日期，不能推出全年策略排序稳定。
+
+若时间允许，年度附录任务应运行以下四个组合、每个组合均覆盖五个策略并统一采用 A / 1200 kWh：
+
+```text
+linear_anchor_main × anchor_final_main       # 已完成主口径
+linear_anchor_main × adjacent_literal_sensitivity
+step_hourly_sensitivity × anchor_final_main
+step_hourly_sensitivity × adjacent_literal_sensitivity
+```
+
+输出每种组合的策略总成本、紧急购电、弃光与排序。该任务不阻塞已签收的主策略比较，也不允许在未运行前把“两日结果”写成年份稳健性结论。
