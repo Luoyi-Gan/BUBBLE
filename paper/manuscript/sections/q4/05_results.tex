@@ -33,4 +33,32 @@ Q4-2 在 Q2 政策一致框架上引入附件 4 的\textbf{交付时段实际价
 
 \subsection{问题四（Q4-3）}
 
-Q4-3 在固定 \texttt{M1\_M6} 下将调整费与紧急购电改为按交付时段实际价格结算。其全年结果与检验待 Q4-3 链路与正文图表一并签收后写入；本节暂不报告 Q4-3 成本数值，以免与 Q3 固定价主结论混比。
+Q4-3 在固定 \texttt{M1\_M6} 下将调整费与紧急购电改为按\textbf{交付时段实际价格}结算，策略结构、更新时点与 Q3 主方案一致，不在看到全年真实价格后重新挑选策略。题设 \texttt{result4-3.xlsx} 的输出区间为 2025 年 2 月 1 日至 12 月 31 日，共 $334$ 日；该区间实际结算成本为 $15\,346\,418.14$ 元，其中普通购电 $12\,447\,748.75$ 元、调整费 $321\,297.70$ 元、紧急购电 $2\,577\,371.68$ 元。若报告 1--12 月完整核算，全年成本为 $17\,489\,808.24$ 元，其中 1 月预热成本为 $2\,143\,390.10$ 元；2 月 1 日继承 SOC 为 $7036.1914\,\mathrm{kWh}$。全年共实施 $1004$ 次有效调整，调整费占全年成本约 $2.03\%$。
+
+与 Q3 固定价主方案（1--12 月 $16\,373\,508.75$ 元）相比，Q4-3 在\textbf{同一策略、不同价格机制}下增加 $1\,116\,299.49$ 元（约 $6.82\%$）；该差异反映波动价权重变化，\textbf{不得}表述为“相对 Q3 节省或增费的主结论”。在 2--12 月输出区间，Q4-3 较 \texttt{result3.xlsx} 核对区间（$14\,512\,748.53$ 元）高 $833\,669.61$ 元（$5.74\%$）；较同区间 Q4-2（$15\,257\,873.75$ 元）高 $88\,544.39$ 元（$0.58\%$），说明在波动价下“计划—调整—紧急”三通道的相对权重进一步向调整与紧急段倾斜。
+
+\input{tables/q4/cost_summary_q43}
+\input{tables/q4/mechanism_compare_q43}
+
+表~\ref{tab:q4-3-cost-summary} 分列预热期与正式输出；表~\ref{tab:q4-3-mechanism-compare} 对照 Q3 与 Q4-3 的价格机制差异。题设格式结果以 2025 年 6 月 21 日为例展示如下。
+
+\input{tables/q4/purchase_q43}
+\input{tables/q4/adjust_q43}
+\input{tables/q4/storage_q43}
+\input{tables/q4/emergency_q43}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.94\linewidth]{figures/q4/fig_q4_3_monthly_cost.png}
+\caption{Q4-3：2025 年 2--12 月月度购电成本构成（数据来源：\texttt{q4\_3\_warmup\_daily.csv}）。}
+\label{fig:q4-3-monthly-cost}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.88\linewidth]{figures/q4/fig_q4_3_mechanism_compare.png}
+\caption{Q4-3 与 Q3 主方案在同策略、不同价格机制下的成本对照（须分列 1--12 月与 2--12 月输出区间）。}
+\label{fig:q4-3-mechanism-compare}
+\end{figure}
+
+图~\ref{fig:q4-3-monthly-cost} 显示调整费与紧急购电在夏秋季占比上升；图~\ref{fig:q4-3-mechanism-compare} 表明交付价机制下总成本系统性高于 Q3 固定价口径，与两问结算定义一致。

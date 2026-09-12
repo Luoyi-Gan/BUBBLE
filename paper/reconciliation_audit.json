@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-12T14:58:16.820902Z",
+  "generated_at": "2026-09-12T16:29:49.131743Z",
   "rows": [
     {
       "question": "Q1",
@@ -494,11 +494,167 @@
       "source_value": "365",
       "status": "已核",
       "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "sections/q4/05_results.tex",
+      "metric": "2-12月总成本",
+      "unit": "元/次",
+      "display_precision": "2",
+      "paper_value": "15346418.14",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "2-12月总成本",
+      "source_value": "15346418.1389",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "sections/q4/05_results.tex",
+      "metric": "1-12月总成本",
+      "unit": "元/次",
+      "display_precision": "2",
+      "paper_value": "17489808.24",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "1-12月总成本",
+      "source_value": "17489808.2371",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "sections/q4/05_results.tex",
+      "metric": "相对Q3增加(1-12)",
+      "unit": "元/次",
+      "display_precision": "2",
+      "paper_value": "1116299.49",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "相对Q3增加(1-12)",
+      "source_value": "1116299.48708",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "sections/q4/05_results.tex",
+      "metric": "相对Q3增加(2-12)",
+      "unit": "元/次",
+      "display_precision": "2",
+      "paper_value": "833669.61",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "相对Q3增加(2-12)",
+      "source_value": "833669.608918",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "sections/q4/05_results.tex",
+      "metric": "相对Q4-2增加(2-12)",
+      "unit": "元/次",
+      "display_precision": "2",
+      "paper_value": "88544.39",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "相对Q4-2增加(2-12)",
+      "source_value": "88544.3889176",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "tables/q4/cost_summary_q43.tex",
+      "metric": "2-12月普通购电",
+      "unit": "元/次",
+      "display_precision": "2",
+      "paper_value": "12447748.75",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "2-12月普通购电",
+      "source_value": "12447748.7525",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "tables/q4/cost_summary_q43.tex",
+      "metric": "2-12月调整费",
+      "unit": "元/次",
+      "display_precision": "2",
+      "paper_value": "321297.70",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "2-12月调整费",
+      "source_value": "321297.70144",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "tables/q4/cost_summary_q43.tex",
+      "metric": "2-12月紧急成本",
+      "unit": "元/次",
+      "display_precision": "2",
+      "paper_value": "2577371.68",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "2-12月紧急成本",
+      "source_value": "2577371.685",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "tables/q4/cost_summary_q43.tex",
+      "metric": "1月预热成本",
+      "unit": "元/次",
+      "display_precision": "2",
+      "paper_value": "2143390.10",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "1月预热成本",
+      "source_value": "2143390.09816",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "tables/q4/mechanism_compare_q43.tex",
+      "metric": "全年调整次数",
+      "unit": "元/次",
+      "display_precision": "0",
+      "paper_value": "1004",
+      "source_file": "output/q4/q4_3_run_metadata.json",
+      "source_column": "全年调整次数",
+      "source_value": "1004",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "sections/q4/06_validation.tex",
+      "metric": "365日物理审计",
+      "unit": "-",
+      "display_precision": "-",
+      "paper_value": "PASS",
+      "source_file": "output/q4/q4_3_physical_audit.json",
+      "source_column": "n_days_pass",
+      "source_value": "365",
+      "status": "已核",
+      "note": ""
+    },
+    {
+      "question": "Q4-3",
+      "paper_location": "sections/q4/06_validation.tex",
+      "metric": "信息集探针",
+      "unit": "-",
+      "display_precision": "-",
+      "paper_value": "PASS",
+      "source_file": "output/q4/q4_3_info_set_audit.json",
+      "source_column": "all_pass",
+      "source_value": "True",
+      "status": "已核",
+      "note": ""
     }
   ],
   "summary": {
-    "total": 38,
-    "passed": 38,
+    "total": 50,
+    "passed": 50,
     "failed": 0
   }
 }

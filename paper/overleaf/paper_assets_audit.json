@@ -13,5 +13,11 @@
     "annual_cost_yuan": 17681029.09881317,
     "export_window_yuan": 15257873.753971763,
     "feb_dec_emergency_kwh": 541155.3930922948
+  },
+  "q4_3": {
+    "annual_cost_yuan": 17489808.237080485,
+    "export_window_yuan": 15346418.13891758,
+    "adjustment_count": 1004,
+    "adjustment_share_pct": 2.033598341335627
   }
 }
