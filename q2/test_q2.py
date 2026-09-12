@@ -505,6 +505,59 @@ class Q2PolicyConsistentTests(unittest.TestCase):
         self.assertEqual(len(cache), before)
 
 
+class PolicyConsistentR4Tests(unittest.TestCase):
+    def test_emergency_interval_labels_use_slot_start_and_end(self) -> None:
+        from q2.export_result2 import format_emergency_interval
+
+        self.assertEqual(format_emergency_interval(45, 46), "07:30-07:50")
+        self.assertEqual(format_emergency_interval(57, 57), "09:30-09:40")
+        self.assertEqual(format_emergency_interval(0, 0), "00:00-00:10")
+        self.assertEqual(format_emergency_interval(143, 143), "23:50-24:00")
+
+    def test_emergency_segments_keep_all_positive_energy(self) -> None:
+        from q2.export_result2 import emergency_segments
+
+        emergency = np.zeros(144)
+        emergency[45] = 10.786
+        emergency[46] = 2.216
+        emergency[57] = 46.823
+        segments = emergency_segments(emergency)
+        self.assertEqual([(t0, t1) for t0, t1, _amount in segments], [(45, 46), (57, 57)])
+        self.assertAlmostEqual(sum(amount for _t0, _t1, amount in segments), float(emergency.sum()))
+
+    def test_candidate_result2_path_is_isolated_from_signed_off_file(self) -> None:
+        from q2.config import (
+            CANDIDATE_RESULT2,
+            POLICY_CONSISTENT_OUTPUT_DIR,
+            SIGNED_OFF_RESULT2,
+            SIGNED_OFF_RESULT2_SHA256,
+        )
+        from q2.export_result2 import assert_isolated_candidate_path
+
+        self.assertEqual(CANDIDATE_RESULT2.parent, POLICY_CONSISTENT_OUTPUT_DIR)
+        self.assertNotEqual(CANDIDATE_RESULT2.resolve(), SIGNED_OFF_RESULT2.resolve())
+        self.assertEqual(len(SIGNED_OFF_RESULT2_SHA256), 64)
+        with self.assertRaises(RuntimeError):
+            assert_isolated_candidate_path(SIGNED_OFF_RESULT2)
+
+    def test_feb1_charge_blocks_match_dispatch_and_inherited_soc(self) -> None:
+        from q2.config import POLICY_CONSISTENT_OUTPUT_DIR
+        from q2.export_result2 import FOUR_HOUR_BLOCKS, block_energy
+
+        dispatch = POLICY_CONSISTENT_OUTPUT_DIR / "dispatch_daily" / "dispatch_2025-02-01.csv"
+        if not dispatch.exists():
+            self.skipTest("C2-R3 Feb 1 dispatch is not on disk")
+        frame = pd.read_csv(dispatch)
+        charge = block_energy(frame["charge_kwh"].to_numpy(float))
+        self.assertEqual(len(FOUR_HOUR_BLOCKS), 6)
+        self.assertEqual(len(charge), 6)
+        self.assertAlmostEqual(float(charge.sum()), float(frame["charge_kwh"].sum()))
+        ledger = pd.read_csv(POLICY_CONSISTENT_OUTPUT_DIR / "feb_dec_daily_summary.csv").iloc[0]
+        january = pd.read_csv(POLICY_CONSISTENT_OUTPUT_DIR / "january_warmup_summary.csv")
+        self.assertAlmostEqual(float(ledger["soc_start_kwh"]), float(january["soc_end_kwh"].iloc[-1]))
+        self.assertAlmostEqual(float(frame["soc_kwh"].iloc[-1]), float(ledger["soc_end_kwh"]))
+
+
 if __name__ == "__main__":
     unittest.main()
 

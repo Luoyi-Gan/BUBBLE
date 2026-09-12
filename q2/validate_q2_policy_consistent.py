@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Independent checks over C2-R1 / R2 / R3 policy-consistent artifacts."""
+"""Independent checks over C2-R1 / R2 / R3 / R4 policy-consistent artifacts."""
 
 from __future__ import annotations
 
@@ -15,10 +15,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from q2.config import (  # noqa: E402
+    CANDIDATE_RESULT2,
     E_INITIAL_KWH,
     E_MAX_KWH,
     E_MIN_KWH,
     FIG_POLICY_CONSISTENT_DIR,
+    FIG_Q2_FINAL_DIR,
     FIXED_SCENARIO_K,
     K_SENSITIVITY_CANDIDATES,
     NUMERIC_TOL,
@@ -26,10 +28,18 @@ from q2.config import (  # noqa: E402
     PILOT_DATES,
     POLICY_CONSISTENT_OUTPUT_DIR,
     POWER_LIMIT_KWH,
+    RESULT2_SIGNED_OFF_BACKUP,
+    SIGNED_OFF_RESULT2,
+    SIGNED_OFF_RESULT2_SHA256,
     SIMULTANEOUS_CD_TOL,
     T,
 )
 from q2.data import load_q2_data  # noqa: E402
+from q2.export_result2 import (  # noqa: E402
+    N_OUTPUT_DAYS,
+    audit_candidate_result2,
+    file_sha256,
+)
 from q2.pilot import planned_q_hash  # noqa: E402
 from q2.policy_consistent import PERIOD_FEB_DEC_OUTPUT, PERIOD_JANUARY_WARMUP  # noqa: E402
 
@@ -114,7 +124,8 @@ def validate_r1(output: Path, data, consistency: dict, report: dict) -> None:
 
     require(list(forecast["date"]) == list(PILOT_DATES), "R1 dates")
     require(report["status"] == "PASS", "validation status")
-    require(report["candidate_result2_xlsx"] is False, "no candidate result2")
+    if not r1_forecast.exists():
+        require(report["candidate_result2_xlsx"] is False, "no candidate result2")
     require(consistency["validation_uses_full_day_actual_lp"] is False, "no full-day actual LP")
     require(consistency["k_used_for"] == ["risk_reserve_R", "intra_day_residual_weights"], "K uses")
     assert_no_forecast_leakage(forecast)
@@ -154,7 +165,7 @@ def validate_r2(
     n_candidates = len(FORECAST_MODES) * len(RISK_ALPHA_CANDIDATES)
     stage = consistency["stage"]
     require(n_candidates == 12, "12 (m, alpha) pairs")
-    if stage == "C2-R3":
+    if stage in ("C2-R3", "C2-R4"):
         require(consistency["annual_run"] is True, "R3 annual run flag")
     elif stage == "C2-R2":
         require(consistency["annual_run"] is False, "R3 annual run not started")
@@ -170,7 +181,8 @@ def validate_r2(
     require(consistency["deployment_include_value_cuts"] is True, "deployment value cuts")
     require(consistency["include_value_cuts"] is True, "include_value_cuts flag")
     require(consistency["include_value_cuts_consistent"] is True, "value-cut consistency")
-    require(report["candidate_result2_xlsx"] is False, "no candidate result2")
+    if stage != "C2-R4":
+        require(report["candidate_result2_xlsx"] is False, "no candidate result2")
     require(diagnostics["selection_role"].eq("diagnostic_only").all(), "R2 MAE diagnostic")
     require(len(deployed) == len(data.dates), "deployed path covers the year for SOC")
     require(deployed["pass"].all(), "deployed physical pass")
@@ -225,9 +237,10 @@ def validate_r3(output: Path, data, consistency: dict, report: dict) -> None:
     alt = pd.read_csv(output / "feb_soc_sensitivity_daily.csv")
     calendar = pd.read_csv(output / "frozen_policy_calendar.csv")
 
-    require(consistency["stage"] == "C2-R3", "R3 stage")
+    require(consistency["stage"] in ("C2-R3", "C2-R4"), "R3/R4 stage")
     require(consistency["annual_run"] is True, "annual run")
-    require(report["candidate_result2_xlsx"] is False, "no candidate result2")
+    if consistency["stage"] == "C2-R3":
+        require(report["candidate_result2_xlsx"] is False, "no candidate result2")
     require(consistency["main_path_initial_rule_unchanged"] is True, "initial rule frozen")
     require(consistency["calibration_include_value_cuts"] is True, "R3 calibration value cuts")
     require(consistency["deployment_include_value_cuts"] is True, "R3 deployment value cuts")
@@ -324,6 +337,52 @@ def validate_r3(output: Path, data, consistency: dict, report: dict) -> None:
     print("C2-R3 artifact validation passed")
 
 
+def validate_r4(output: Path, data, consistency: dict, report: dict) -> None:
+    require(consistency["stage"] == "C2-R4", "R4 stage")
+    require(report["stage"] == "C2-R4", "R4 report stage")
+    require(report["status"] == "PASS", "R4 status")
+    require(report["candidate_result2_xlsx"] is True, "candidate result2 flag")
+    require(consistency["candidate_result2_xlsx"] is True, "audit candidate flag")
+    require(consistency["k8_not_cost_optimal"] is True, "K=8 not cost-optimal")
+    require(consistency["k8_paper_language"] == "预注册且对 K=4/12 稳定的简洁主方案", "K=8 paper language")
+    require(consistency["old_full_path_role"] == "信息更强的近似对照", "old path role")
+    require(CANDIDATE_RESULT2.exists(), "candidate workbook missing")
+    require(CANDIDATE_RESULT2.resolve() != SIGNED_OFF_RESULT2.resolve(), "candidate overwrote signed-off file")
+    require(CANDIDATE_RESULT2.parent.resolve() == output.resolve(), "candidate not in policy-consistent dir")
+    require(file_sha256(SIGNED_OFF_RESULT2) == SIGNED_OFF_RESULT2_SHA256, "signed-off result2 hash")
+    require(RESULT2_SIGNED_OFF_BACKUP.exists(), "signed-off backup missing")
+    require(file_sha256(RESULT2_SIGNED_OFF_BACKUP) == SIGNED_OFF_RESULT2_SHA256, "backup hash")
+    require(FIG_Q2_FINAL_DIR.resolve() != FIG_POLICY_CONSISTENT_DIR.resolve(), "figure dirs collapsed")
+
+    january = pd.read_csv(output / "january_warmup_summary.csv")
+    feb_dec = pd.read_csv(output / "feb_dec_daily_summary.csv")
+    inherited = float(january["soc_end_kwh"].iloc[-1])
+    audit = audit_candidate_result2(
+        CANDIDATE_RESULT2,
+        output / "dispatch_daily",
+        feb_dec,
+        data,
+        inherited,
+    )
+    require(audit["summary"]["pass"] is True, "cell audit pass")
+    require(audit["summary"]["n_days"] == N_OUTPUT_DAYS, "334 official days")
+    require(audit["summary"]["n_periods"] == T, "144 periods")
+    require(report["result2_cell_audit_pass"] is True, "report cell audit flag")
+    require(
+        abs(float(feb_dec["soc_start_kwh"].iloc[0]) - inherited) < NUMERIC_TOL,
+        "R4 Feb 1 inherited SOC",
+    )
+    for stem in (
+        "fig_q2_pc_closed_loop",
+        "fig_q2_pc_representative_day",
+        "fig_q2_pc_forecast_calendar",
+        "fig_q2_pc_cost_comparison",
+    ):
+        require((FIG_POLICY_CONSISTENT_DIR / f"{stem}.pdf").exists(), f"missing {stem}.pdf")
+        require((FIG_POLICY_CONSISTENT_DIR / f"{stem}.png").exists(), f"missing {stem}.png")
+    print("C2-R4 artifact validation passed")
+
+
 def main() -> None:
     output = POLICY_CONSISTENT_OUTPUT_DIR
     data = load_q2_data()
@@ -338,8 +397,10 @@ def main() -> None:
         validate_r1(output, data, consistency, report)
     if (output / "closed_loop_calibration.csv").exists():
         validate_r2(output, data, diagnostics, consistency, report)
-    if consistency.get("stage") == "C2-R3" and (output / "q2_redesign_daily_summary.csv").exists():
+    if consistency.get("stage") in ("C2-R3", "C2-R4") and (output / "q2_redesign_daily_summary.csv").exists():
         validate_r3(output, data, consistency, report)
+    if consistency.get("stage") == "C2-R4":
+        validate_r4(output, data, consistency, report)
 
 
 if __name__ == "__main__":

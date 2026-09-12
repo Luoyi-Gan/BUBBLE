@@ -19,6 +19,14 @@ FULL_K8_RISK_OUTPUT_DIR = ROOT / "output" / "q2_full_k8_risk"
 POLICY_CONSISTENT_OUTPUT_DIR = ROOT / "output" / "q2_policy_consistent"
 FIG_DIR = ROOT / "fig" / "q2_pilot"
 FIG_POLICY_CONSISTENT_DIR = ROOT / "fig" / "q2_policy_consistent"
+FIG_Q2_FINAL_DIR = ROOT / "fig" / "q2_final"
+SIGNED_OFF_RESULT2 = ROOT / "output" / "result2.xlsx"
+SIGNED_OFF_RESULT2_SHA256 = (
+    "70a9785c9e2bba66f7694878e4587ad15c57dc090ec6798d07ba6780b4780ef7"
+)
+RESULT2_TEMPLATE = ATTACH_DIR / "附件5" / "result2.xlsx"
+CANDIDATE_RESULT2 = POLICY_CONSISTENT_OUTPUT_DIR / "result2.xlsx"
+RESULT2_SIGNED_OFF_BACKUP = POLICY_CONSISTENT_OUTPUT_DIR / "result2_signed_off_backup.xlsx"
 
 T = 144
 DELTA_H = 1.0 / 6.0

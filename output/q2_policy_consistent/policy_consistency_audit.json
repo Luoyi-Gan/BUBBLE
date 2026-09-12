@@ -1,5 +1,5 @@
 {
-  "stage": "C2-R3",
+  "stage": "C2-R4",
   "policy": "single baseline-forecast day-ahead LP plus K=8 risk reserve and residual-matching 10-minute MPC",
   "k_used_for": [
     "risk_reserve_R",
@@ -39,6 +39,14 @@
   "residual_pool_strictly_prior": true,
   "current_period_actuals_only": true,
   "annual_run": true,
-  "candidate_result2_xlsx": false,
-  "elapsed_seconds": 3470.9426049999893
+  "candidate_result2_xlsx": true,
+  "elapsed_seconds": 3470.9426049999893,
+  "candidate_result2_path": "output/q2_policy_consistent/result2.xlsx",
+  "signed_off_result2_path": "output/result2.xlsx",
+  "signed_off_result2_sha256": "70a9785c9e2bba66f7694878e4587ad15c57dc090ec6798d07ba6780b4780ef7",
+  "signed_off_result2_unchanged": true,
+  "k8_paper_language": "预注册且对 K=4/12 稳定的简洁主方案",
+  "k8_not_cost_optimal": true,
+  "old_full_path_role": "信息更强的近似对照",
+  "r4_elapsed_seconds": 8.108884958026465
 }

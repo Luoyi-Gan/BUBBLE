@@ -1,8 +1,11 @@
 {
-  "stage": "C2-R3",
+  "stage": "C2-R4",
   "elapsed_seconds": 3470.9426049999893,
   "n_cut_cache_entries": 1067,
   "main_path_days": 365,
   "dispatch_dir": "output/q2_policy_consistent/dispatch_daily",
-  "figure_dir": "fig/q2_policy_consistent"
+  "figure_dir": "fig/q2_policy_consistent",
+  "candidate_result2": "output/q2_policy_consistent/result2.xlsx",
+  "signed_off_backup": "output/q2_policy_consistent/result2_signed_off_backup.xlsx",
+  "r4_elapsed_seconds": 8.108884958026465
 }
