@@ -1,0 +1,8 @@
+metric,value,unit,meaning
+baseline_grid_purchase_kwh,61789.9354,kWh,"无储能无售电：g=max(L-P,0)"
+baseline_purchase_cost_yuan,48052.04659084666,yuan,基准购电费
+baseline_curtailment_kwh,6247.962966666666,kWh,"基准弃光 s=max(P-L,0)"
+m1_grid_purchase_kwh,57526.24348088351,kWh,正式 M1 总购电量
+m1_purchase_cost_yuan,33801.49554222201,yuan,正式 M1 购电费
+absolute_cost_saving_yuan,14250.55104862465,yuan,基准费用减 M1 费用
+cost_saving_ratio,0.2965649136646598,1,节省比例（相对基准）

@@ -1,0 +1,83 @@
+\subsubsection{信息结构与预测映射}
+
+设一天含 $T=144$ 个 10 分钟时段，$\Delta t=1/6\,\mathrm{h}$。预测更新时刻为 $0{:}00$、$6{:}00$、$12{:}00$ 和 $18{:}00$，记其集合为 $\mathcal U$。以 $m_\tau$ 表示更新时刻 $\tau$ 后首个可调整时段，则
+\begin{equation}
+m_{0{:}00}=1,\qquad m_{6{:}00}=37,\qquad m_{12{:}00}=73,\qquad m_{18{:}00}=109.
+\label{eq:q3-first-mutable}
+\end{equation}
+也就是说，$6{:}00$ 的新预报只从 $6{:}10$ 开始生效；此前已执行的购电、充放电和储电量均锁定。
+
+原始负荷功率与光伏功率统一换算为时段能量：
+\begin{equation}
+L_{d,t}=\ell_{d,t}\Delta t,\qquad P_{d,t}=\rho_{d,t}\Delta t.
+\label{eq:q3-energy-conversion}
+\end{equation}
+其中 $d$ 为日期，$t$ 为时段。对在时刻 $\tau$ 发布的逐小时光伏预报，令 $z_{d,h}^{\tau}$ 为相邻的可用预报节点；以更新时刻刚观测到的光伏作为起始锚点，并在相邻节点间按时间权重 $\lambda_t\in[0,1]$ 线性插值：
+\begin{equation}
+\widehat P_{d,t}^{\tau}=(1-\lambda_t)z_{d,h}^{\tau}+\lambda_t z_{d,h+1}^{\tau}.
+\label{eq:q3-pv-interpolation}
+\end{equation}
+式\eqref{eq:q3-pv-interpolation}中，更新时刻之前的时段直接保留已观测实际值，不参与未来预测插值。这样，任一更新时刻的预测路径只由已发布信息和已发生观测构成。
+
+由于题目未提供独立负荷预报，令 $\mathcal H_d$ 为日期严格早于 $d$ 的最近至多四个同星期历史日。日前负荷预测取为
+\begin{equation}
+\widehat L_{d,t}=\frac{1}{|\mathcal H_d|}\sum_{j\in\mathcal H_d}L_{j,t}.
+\label{eq:q3-load-forecast}
+\end{equation}
+在日内更新时，已经执行的前缀用实际负荷和实际光伏更新状态；未执行时段仍使用式\eqref{eq:q3-load-forecast}与当前已发布的式\eqref{eq:q3-pv-interpolation}。这避免将当天未来实际负荷或光伏提前带入承诺决策。
+
+\subsubsection{计划调整的结算模型}
+
+记 $g_{d,t}^{0}$ 为当天 $0{:}00$ 制定的普通购电承诺，$g_{d,t}$ 为该时段到来前最后一次有效调整后的承诺，$e_{d,t}$ 为实时紧急购电量。对同一时段，结算只相对 $g_{d,t}^{0}$ 进行一次：
+\begin{equation}
+\phi_t\left(g_{d,t}^{0},g_{d,t}\right)=p_tg_{d,t}+\frac{1}{2}p_t\left|g_{d,t}-g_{d,t}^{0}\right|.
+\label{eq:q3-settlement}
+\end{equation}
+当 $g_{d,t}\leq g_{d,t}^{0}$ 时，式\eqref{eq:q3-settlement}等于实际采购电费加取消部分的 $50\%$ 违约费；当 $g_{d,t}>g_{d,t}^{0}$ 时，增量按 $1.5p_t$ 计费。为便于线性规划求解，引入非负变量 $u_{d,t},v_{d,t}$：
+\begin{equation}
+g_{d,t}-g_{d,t}^{0}=u_{d,t}-v_{d,t},\qquad u_{d,t},v_{d,t}\geq0,
+\label{eq:q3-adjust-linearization}
+\end{equation}
+并将调整成本写为 $p_tg_{d,t}+\tfrac12p_t(u_{d,t}+v_{d,t})$。因其系数为正，最优解不会同时令 $u_{d,t}$ 和 $v_{d,t}$ 为正。
+
+\subsubsection{滚动购电与储能优化模型}
+
+在更新时刻 $\tau$，令剩余时段集合为 $\mathcal T_\tau=\{m_\tau,\ldots,T\}$。以真实当前储电量 $E_{d,m_\tau-1}$ 为初始状态，最小化剩余时域的结算费、紧急购电费和下一日储电量价值：
+\begin{equation}
+\min\ J_{d,\tau}=\sum_{t\in\mathcal T_\tau}\left[p_tg_{d,t}+\frac12p_t(u_{d,t}+v_{d,t})+5p_te_{d,t}\right]+V_{d+1}(E_{d,T}).
+\label{eq:q3-objective}
+\end{equation}
+其中 $V_{d+1}(\cdot)$ 由下一日的因果负荷预测、光伏预测和同一储能约束求得。将不同参考储电量下的下一日 LP 对偶斜率记为 $(\bar E_q,\beta_q,\gamma_q)$，采用分段线性下包络：
+\begin{equation}
+V_{d+1}(E_{d,T})\geq \beta_q+\gamma_q(E_{d,T}-\bar E_q),\qquad \forall q.
+\label{eq:q3-terminal-value}
+\end{equation}
+终端项只评估剩余储能的机会成本，不重复计入下一日账单。
+
+普通购电、紧急购电、光伏和储能放电共同供给母线；负荷、储能充电与弃光消纳能量。故对 $t\in\mathcal T_\tau$ 有
+\begin{align}
+x_{d,t}+e_{d,t}+\widehat P_{d,t}^{\tau}-w_{d,t}+r_{d,t}&=\widehat L_{d,t}+c_{d,t},\label{eq:q3-balance}\\
+E_{d,t}&=E_{d,t-1}+\eta_c c_{d,t}-\frac{r_{d,t}}{\eta_d},\label{eq:q3-soc}\\
+0\le x_{d,t}&\le g_{d,t},\qquad 0\le e_{d,t},\label{eq:q3-normal-limit}\\
+0\le c_{d,t},r_{d,t}&\le5000\Delta t,\qquad0\le w_{d,t}\le\widehat P_{d,t}^{\tau},\label{eq:q3-power-limit}\\
+1200\le E_{d,t}&\le10800,\qquad \eta_c=\eta_d=\sqrt{0.9}.\label{eq:q3-soc-limit}
+\end{align}
+其中 $x_{d,t}$ 是普通承诺中的实际取用量，约束\eqref{eq:q3-normal-limit}确保普通购电不能超过已承诺额度；不足部分只能由当前实际执行阶段的 $e_{d,t}$ 补足。已执行或已锁定时段满足
+\begin{equation}
+g_{d,t}=g_{d,t}^{\mathrm{pre}},\qquad t<m_\tau,
+\label{eq:q3-lock}
+\end{equation}
+其中 $g_{d,t}^{\mathrm{pre}}$ 是本次更新前的承诺。式\eqref{eq:q3-lock}将信息边界直接写入模型，而非在求解后再修正计划。
+
+实际执行每次只实施当前 10 分钟动作：把式\eqref{eq:q3-balance}中的预测量替换为当期实测 $L_{d,t},P_{d,t}$，将得到的 $E_{d,t}$ 带入下一时段。未来时段始终保留当时可得的预测量，因此滚动求解不等同于事后已知完整实际路径的最优调度。
+
+\subsubsection{信息价值触发机制与对照策略}
+
+为判断某次新预报是否值得用于调整，分别在“锁定原承诺”和“允许调整”下求解式\eqref{eq:q3-objective}：
+\begin{align}
+J_{\tau}^{\mathrm{fix}}&=\min\{J_{d,\tau}:g_{d,t}=g_{d,t}^{\mathrm{pre}},\ t\in\mathcal T_\tau\},\\
+J_{\tau}^{\mathrm{free}}&=\min\{J_{d,\tau}:g_{d,t}\ge0,\ t\in\mathcal T_\tau\},\\
+\operatorname{VoI}_{\tau}&=J_{\tau}^{\mathrm{fix}}-J_{\tau}^{\mathrm{free}}.
+\label{eq:q3-voi}
+\end{align}
+当 $\operatorname{VoI}_{\tau}>\varepsilon$ 时实施新承诺，否则维持 $g^{\mathrm{pre}}$；$\varepsilon=0.01$ 元仅用于屏蔽数值舍入引起的无意义微调。以 M0 表示 $0{:}00$ 后不调整，以 M1/M6 表示三个更新点均评估并按式\eqref{eq:q3-voi}实施，以 $M_6$、$M_{12}$、$M_{18}$ 表示仅开放一个更新点的消融策略。它们共同回答后续预报是否有价值，以及何时更新最有效。

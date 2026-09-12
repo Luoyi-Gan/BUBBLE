@@ -1,0 +1,11 @@
+求解得到全天计划购电量 $57526.2435\,\mathrm{kWh}$，购电费 $33801.4955$ 元。无储能基准购电费为 $48052.0466$ 元，储能使成本减少 $14250.5510$ 元，降幅为 $29.6565\%$。总充电量和总放电量分别为 $19842.7105\,\mathrm{kWh}$ 和 $17858.4394\,\mathrm{kWh}$，弃光量为 0。指定时段购电结果列于表\ref{tab:q1-purchase}，六个四小时区间的充放电结果及首末储电量列于表\ref{tab:q1-storage}，表头和排列沿用题目表 1、表 2；电量单位为 kWh，购电费单位为元。
+\input{tables/q1/purchase}
+\input{tables/q1/storage}
+
+图\ref{fig:q1-dispatch}显示，储能主要在低价时段和光伏出力较高的时段充电，在电价上升后释放能量；中午光伏提高时，外网购电明显下降。储电量始终位于 $1200\sim10800\,\mathrm{kWh}$，并于日末回到 $6000\,\mathrm{kWh}$，说明成本下降来自时段间能量转移，而非透支初始储能。最大购电功率为 $8458.8273\,\mathrm{kW}$；该值依赖“外网接口容量未给定、暂不设上限”的建模边界。
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.94\linewidth]{figures/q1/q1_figure_2.png}
+\caption{问题一最优调度与储能状态}\label{fig:q1-dispatch}
+\end{figure}
+\FloatBarrier

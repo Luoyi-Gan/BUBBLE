@@ -1,0 +1,21 @@
+{
+  "inputs": {
+    "outputs/Q1_Overleaf.zip": "3951f9215397009de6baade8b0d5b205be1b00cb8a5267db5b6fadf360c33438",
+    "outputs/BUBBLE_Overleaf_structure_update.zip": "a54b3d2dab967063414c95b17c8d2db08a5c10975a07171ef1be525bc117ce12",
+    "outputs/BUBBLE_Overleaf/sections/01_problem_restatement.tex": "0d59df9b2ae068ca4abe719a06f8cccb37fc340e01bf8795d4e53ac0b02a0523",
+    "outputs/official_result_tables/result1.xlsx": "9cf1273891a037107949739fb4244d3cec63bafa9e7c53a82008525333215b5f"
+  },
+  "figures": {
+    "figures/q1/q1_figure_1.png": "63958fb37a7e526d730642e6653ce5e4ec0434d98f6c0db21a37f6cd78eb500e",
+    "figures/q1/q1_figure_2.png": "c4b656488fda010965e2c98af6e78c4182fcd90464f98d1a5e847bdd9f2a563f"
+  },
+  "q1_plan_rows": 144,
+  "q1_plan_total_from_xlsx": 57526.24348088351,
+  "q1_total_from_summary": 57526.24348088351,
+  "status": {
+    "q1": "method_and_data_done__paper_integrated",
+    "q2": "policy_consistent_output_interval_result__paper_integrated",
+    "q3": "annual_causal_result_and_export__paper_integrated",
+    "q4": "running__paper_results_blocked"
+  }
+}
