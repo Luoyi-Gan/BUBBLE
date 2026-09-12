@@ -1,0 +1,25 @@
+设第 $d$ 日有 $T=144$ 个 $10$ 分钟时段。以 $mathcal H_d$ 表示严格早于 $d$ 的最近至多四个同星期历史日，以 $mathcal R_d$ 表示最近至多七个已结束日，日前预测定义为
+\begin{equation}
+\widehat L_{d,t}=\frac{1}{|\mathcal H_d|}\sum_{j\in\mathcal H_d}L_{j,t},\qquad
+\widehat P_{d,t}=\frac{1}{|\mathcal R_d|}\sum_{j\in\mathcal R_d}P_{j,t}.
+\label{eq:q2-forecast}
+\end{equation}
+由同一历史日产生的负荷与光伏残差分别记为 $r^L_{j,t}=L_{j,t}-\widehat L_{j,t}$、$r^P_{j,t}=P_{j,t}-\widehat P_{j,t}$。在最近至多 $28$ 个完整残差日中用 PAM/K-medoids 选取 $K=8$ 条代表轨迹；第 $k$ 条轨迹的权重为其所属簇的样本占比 $\pi_k$。
+
+令 $q_{d,t}$ 为日初锁定且按计划价格结算的普通购电额度，$x_{d,t}$ 为实际取用量，$e_{d,t}$ 为紧急购电量。对第 $k$ 条残差轨迹，净负荷预测误差为 $r^N_{d,t,k}=r^L_{d,t,k}-r^P_{d,t,k}$；其正向 $\alpha$ 分位数给出风险储备
+\begin{equation}
+R_{d,t}(\alpha)=\max\left\{0,Q_{\alpha,\pi}\left(r^N_{d,t,1},\ldots,r^N_{d,t,K}\right)\right\}.
+\label{eq:q2-reserve}
+\end{equation}
+日前层只在唯一基准预测轨迹上生成 $q$，并求解
+\begin{align}
+\min\quad &\sum_{t=1}^{T}\left(p_tq_{d,t}+5p_te_{d,t}\right)+V_{d+1}(E_{d,T}),\label{eq:q2-objective}\\
+\text{s.t.}\quad &q_{d,t}\ge R_{d,t}(\alpha),\quad 0\le x_{d,t}\le q_{d,t},\nonumber\\
+&x_{d,t}+e_{d,t}+\widehat P_{d,t}-w_{d,t}+r_{d,t}=\widehat L_{d,t}+c_{d,t},\label{eq:q2-balance}\\
+&E_{d,t}=E_{d,t-1}+\eta_cc_{d,t}-r_{d,t}/\eta_d.\label{eq:q2-soc}
+\end{align}
+式中 $c,r,w,E$ 分别为公共母线侧充电、放电、弃光和时段末储电量；它们满足问题一相同的功率、SOC 与弃光边界，且 $\eta_c=\eta_d=\sqrt{0.9}$。$V_{d+1}(\cdot)$ 为按次日因果预测构造的 $48$ 小时终端价值项，只衡量日末能量的机会成本，不提前计入下一日账单。
+
+在日内执行时，$q_{d,t}$ 保持不变。到时段 $t$ 为止已观测的残差前缀与每条 medoid 前缀比较，得到后验权重 $\widetilde\pi_{k,t}$；未来预测取对应残差的加权均值，当前时段以实际 $L_{d,t},P_{d,t}$ 闭合能量平衡。控制器仅执行滚动 LP 的第一步，下一时段再用更新后的 SOC 重算。这一非前瞻性限制使日前代表轨迹仅承担计划评估和预测修正功能，而不是可直接执行的完整调度方案。
+
+候选预测结构 $m\in\{m_1,m_2,m_3\}$ 与 $\alpha\in\{0.60,0.70,0.80,0.90\}$ 每 $14$ 日在此前已结束的验证日上联合评估。每个候选都须连续传递自身 SOC，按“预测--锁定 $q$--逐时段 MPC--实际结算”闭环计算平均成本；并列时依次偏好未用额度较少、更简单的预测结构和较小的 $\alpha$。因此参数选择与正式部署共享同一信息集和同一控制政策。

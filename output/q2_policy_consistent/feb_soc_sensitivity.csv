@@ -1,0 +1,3 @@
+soc_source,feb1_soc_start_kwh,dec31_soc_end_kwh,n_days,start_date,end_date,forecast_modes,requested_k,planned_cost_yuan,emergency_cost_yuan,total_cost_yuan,emergency_kwh,unused_plan_kwh,curtailment_kwh,only_registered_boundary_changed,main_path
+inherited_january_warmup,8390.680830206398,1200.0000000493028,334,2025-02-01,2025-12-31,m1;m2;m3,8,11883687.236905474,3282851.224024079,15166538.460929552,924502.9287147812,640227.819368735,1309834.0417919536,False,True
+registered_boundary_E_INITIAL_6000,6000.0,1200.0000000493028,334,2025-02-01,2025-12-31,m1;m2;m3,8,11884762.231213816,3282851.224024079,15167613.455237895,924502.9287147812,640227.819368735,1309834.0417919536,True,False
