@@ -7,7 +7,7 @@
 - 1 月预热实际成本 1977568.32 元；2 月 1 日继承 SOC 8390.680830 kWh。
 - 2—12 月正式成本 15166538.46 元，紧急购电 924502.93 kWh。
 - K∈{4,8,12} 闭环敏感性结论：`retain_k8_stable`。
-- 候选附件写入 `output/q2_policy_consistent/result2.xlsx`；旧签收文件 `output/result2.xlsx` 未覆盖，可回退副本 `output/q2_policy_consistent/result2_signed_off_backup.xlsx`。
+- 候选附件写入 `output/q2_policy_consistent/result2.xlsx`；**已同步至正式路径 `output/result2.xlsx`（2026-09-12 队长确认 V2 主方案）**。旧 V1 可回退副本 `output/q2_policy_consistent/result2_signed_off_backup.xlsx`。
 - 旧 result2.xlsx SHA-256：`70a9785c9e2bba66f7694878e4587ad15c57dc090ec6798d07ba6780b4780ef7`。
 - 逐格对账：`result2_cell_audit.json` / `result2_cell_audit.csv`；pass=True。
 - 最终图写入 `fig/q2_policy_consistent/`，未改写 `fig/q2_final/`。

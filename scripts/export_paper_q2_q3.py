@@ -2,7 +2,7 @@
 """Export Q2/Q3 paper tables and figures from signed-off workbooks and ledgers.
 
 Reads only accepted outputs:
-- Q2: output/q2_policy_consistent/result2.xlsx and annual CSV ledgers
+- Q2: `output/result2.xlsx`（V2 政策一致）与 `output/q2_policy_consistent/` 年度台账
 - Q3: output/result3.xlsx and output/q3_full_annual/*.csv
 
 Writes LaTeX tables under paper/manuscript/ and PNG/PDF figures under paper/overleaf/.
@@ -33,7 +33,7 @@ TABLES_Q3 = MANUSCRIPT / "tables" / "q3"
 FIG_Q2 = PAPER / "figures" / "q2"
 FIG_Q3 = PAPER / "figures" / "q3"
 
-RESULT2 = ROOT / "output" / "q2_policy_consistent" / "result2.xlsx"
+RESULT2 = ROOT / "output" / "result2.xlsx"
 RESULT3 = ROOT / "output" / "result3.xlsx"
 Q2_DAILY = ROOT / "output" / "q2_policy_consistent" / "feb_dec_daily_summary.csv"
 Q2_COST = ROOT / "output" / "q2_policy_consistent" / "cost_breakdown.csv"
