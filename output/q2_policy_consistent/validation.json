@@ -1,0 +1,148 @@
+{
+  "status": "PASS",
+  "stage": "C2-R2",
+  "n_candidates_per_block": 12,
+  "scored_blocks": 26,
+  "fallback_blocks": 1,
+  "selected_pairs": [
+    {
+      "calibration_date": "2025-01-01",
+      "forecast_mode": "m1",
+      "risk_alpha": NaN
+    },
+    {
+      "calibration_date": "2025-01-15",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-01-29",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-02-12",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.7
+    },
+    {
+      "calibration_date": "2025-02-26",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-03-12",
+      "forecast_mode": "m2",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-03-26",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-04-09",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-04-23",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-05-07",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-05-21",
+      "forecast_mode": "m1",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-06-04",
+      "forecast_mode": "m1",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-06-18",
+      "forecast_mode": "m1",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-07-02",
+      "forecast_mode": "m1",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-07-16",
+      "forecast_mode": "m2",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-07-30",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-08-13",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-08-27",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-09-10",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-09-24",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-10-08",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-10-22",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-11-05",
+      "forecast_mode": "m2",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-11-19",
+      "forecast_mode": "m3",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-12-03",
+      "forecast_mode": "m1",
+      "risk_alpha": 0.6
+    },
+    {
+      "calibration_date": "2025-12-17",
+      "forecast_mode": "m2",
+      "risk_alpha": 0.7
+    },
+    {
+      "calibration_date": "2025-12-31",
+      "forecast_mode": "m1",
+      "risk_alpha": 0.6
+    }
+  ],
+  "deployed_days": 365,
+  "protected_outputs_unchanged": true,
+  "candidate_result2_xlsx": false,
+  "mae_is_diagnostic_only": true
+}
