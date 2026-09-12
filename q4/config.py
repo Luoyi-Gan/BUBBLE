@@ -32,6 +32,11 @@ Q4_3_YEAR_END_BOUNDARY = "A_q2_aligned"
 Q4_3_YEAR_END_SOC_KWH = 1200.0
 Q4_3_STRATEGY = "M1_M6"
 SETTLEMENT_RULE = "delivery_time_actual_price"
+Q4_3_ORACLE_DISPATCH_DIR = OUTPUT_DIR / "q4_3_oracle_dispatch_daily"
+Q4_3_SETTLEMENT_SENSITIVITY_CSV = OUTPUT_DIR / "q4_3_settlement_sensitivity.csv"
+Q4_3_SETTLEMENT_SENSITIVITY_JSON = OUTPUT_DIR / "q4_3_settlement_sensitivity.json"
+Q4_3_ORACLE_DAILY_CSV = OUTPUT_DIR / "q4_3_oracle_warmup_daily.csv"
+Q4_3_SENSITIVITY_SUMMARY_JSON = OUTPUT_DIR / "q4_3_sensitivity_summary.json"
 
 CANDIDATE_MODELS = (1, 2, 4)
 CANDIDATE_NAMES = {

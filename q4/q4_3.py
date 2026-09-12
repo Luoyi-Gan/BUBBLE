@@ -66,9 +66,20 @@ def _index_to_update_hour(index: int) -> int | None:
     return inverse.get(index)
 
 
-def _price_vector(bundle: Q4Bundle, day_index: int, tau: int) -> np.ndarray:
-    forecast, _fb = remaining_price_forecast(bundle, day_index, tau)
-    return forecast
+def _decision_prices(
+    bundle: Q4Bundle, day_index: int, tau: int, price_mode: str
+) -> tuple[np.ndarray, bool]:
+    if price_mode == "oracle":
+        return np.asarray(bundle.prices.price[day_index], dtype=float).copy(), False
+    return remaining_price_forecast(bundle, day_index, tau)
+
+
+def _midnight_prices(
+    bundle: Q4Bundle, day_index: int, price_mode: str
+) -> tuple[np.ndarray, str, int]:
+    if price_mode == "oracle":
+        return np.asarray(bundle.prices.price[day_index], dtype=float).copy(), "price_oracle", -1
+    return day_ahead_today(bundle, day_index)
 
 
 def build_q4_3_value_cuts(
@@ -180,6 +191,7 @@ def plan_g0(
     year_end_soc_kwh: float | None = Q4_3_YEAR_END_SOC_KWH,
     value_cut_cache: dict | None = None,
     with_value_cuts: bool = True,
+    price_mode: str = "causal",
 ) -> np.ndarray:
     """Midnight g0 only (no intraday updates). Used by information-set probes."""
     data = bundle.q3
@@ -188,7 +200,7 @@ def plan_g0(
     next_terminal = next_day_year_end_soc(day_index, n_days, year_end_soc_kwh)
     plan_load = planning_load_curve(data, day_index, LOAD_INFORMATION_MAIN)
     mapped0 = map_issue_forecast(data, day_index, 0, PV_MAPPING_LINEAR)
-    price0, _src, _chosen = day_ahead_today(bundle, day_index)
+    price0, _src, _chosen = _midnight_prices(bundle, day_index, price_mode)
     cuts = ()
     if with_value_cuts:
         cuts, _rows = build_q4_3_value_cuts(
@@ -224,6 +236,7 @@ def run_q4_3_day(
     initial_soc: float,
     year_end_soc_kwh: float | None = Q4_3_YEAR_END_SOC_KWH,
     value_cut_cache: dict | None = None,
+    price_mode: str = "causal",
 ) -> Q43DayResult:
     data = bundle.q3
     date = data.dates[day_index].strftime("%Y-%m-%d")
@@ -238,7 +251,7 @@ def run_q4_3_day(
     started = perf_counter()
     mapped0 = map_issue_forecast(data, day_index, 0, PV_MAPPING_LINEAR)
     current_forecast = mapped0.today_kwh.copy()
-    price0, price_src, chosen = day_ahead_today(bundle, day_index)
+    price0, price_src, chosen = _midnight_prices(bundle, day_index, price_mode)
     cuts, value_rows = build_q4_3_value_cuts(
         bundle, day_index, 0, next_terminal, value_cut_cache
     )
@@ -299,7 +312,7 @@ def run_q4_3_day(
                 bundle, day_index, hour, next_terminal, value_cut_cache
             )
             value_rows.extend(rows)
-            price_now, _fb = remaining_price_forecast(bundle, day_index, t)
+            price_now, _fb = _decision_prices(bundle, day_index, t, price_mode)
             pv_plan = current_forecast[t:]
             load_plan = plan_load[t:]
             g_pre = g[t:].copy()
@@ -336,7 +349,7 @@ def run_q4_3_day(
                     "voi_yuan": voi,
                     "implemented": implemented,
                     "l1_change_kwh": float(np.abs(delta).sum()),
-                    "price_source": "intraday_ols",
+                    "price_source": "price_oracle" if price_mode == "oracle" else "intraday_ols",
                     "chosen_price_model": chosen,
                     "affected_periods": f"{t}:{T - 1}",
                     "prefix_lock_ok": prefix_ok,
@@ -349,7 +362,7 @@ def run_q4_3_day(
             if np.max(np.abs(g[:t] - g_before_update[:t])) > NUMERIC_TOL:
                 locked_violations += 1
 
-        price_now, _fb = remaining_price_forecast(bundle, day_index, t)
+        price_now, _fb = _decision_prices(bundle, day_index, t, price_mode)
         pv_horizon = current_forecast[t:].copy()
         pv_horizon[0] = actual_pv[t]
         load_horizon = execution_load_horizon(plan_load, actual_load, t)
@@ -420,6 +433,7 @@ def run_q4_3_day(
         "year_end_boundary": Q4_3_YEAR_END_BOUNDARY,
         "year_end_soc_kwh": year_end_soc_kwh,
         "settlement_rule": SETTLEMENT_RULE,
+        "price_mode": price_mode,
         "normal_cost_yuan": float(np.sum(actual_p * g_final)),
         "adjustment_cost_yuan": float(np.sum(phi - actual_p * g_final)),
         "emergency_cost_yuan": float(np.sum(emergency_cost)),
