@@ -1,3 +1,7 @@
 # Q2 结果表
 
-依据原题表1、表2、表3的适用要求逐项填报；表头不改。问题四分别对应问题二、问题三。用黑色三线表、黑色文字、无底色。未运行的结果不能用0占位。
+由 `python3 scripts/export_paper_q2_q3.py` 从 `output/q2_policy_consistent/result2.xlsx` 与年度台账生成。
+
+- `purchase.tex` / `storage.tex` / `emergency.tex`：2025-06-21 题设格式示例
+- `cost_summary.tex`：1 月预热与 2--12 月正式输出分列
+- `parameter_selection.tex`：$K=4,8,12$ 闭环复核
