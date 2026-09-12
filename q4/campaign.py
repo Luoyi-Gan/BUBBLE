@@ -45,26 +45,42 @@ def run_q4_2_campaign(
     ahead_path = out_dir / "q4_2_day_ahead_audit.csv"
     scen_path = out_dir / "q4_2_scenario_audit.csv"
     ledger_path = out_dir / "q4_2_cost_ledger.csv"
-    for path in (daily_path, ahead_path, scen_path, ledger_path):
+    alpha_sel_path = out_dir / "q4_2_alpha_selection.csv"
+    alpha_daily_path = out_dir / "q4_2_alpha_calibration_daily.csv"
+    for path in (
+        daily_path,
+        ahead_path,
+        scen_path,
+        ledger_path,
+        alpha_sel_path,
+        alpha_daily_path,
+    ):
         if path.exists():
             path.unlink()
     soc = E_INITIAL_KWH
     start_soc = np.full(bundle.n_days(), np.nan)
     calibrated: dict[int, float | None] = {}
-    alpha_rows: list[dict] = []
     detail = {}
     for i in range(end_index + 1):
         start_soc[i] = soc
         cal = (i // RISK_CALIBRATION_DAYS) * RISK_CALIBRATION_DAYS
         if i >= RISK_WARMUP_DAYS and cal not in calibrated and i == cal:
-            alpha, records = select_risk_alpha(bundle, start_soc, i, FIXED_SCENARIO_K)
-            calibrated[cal] = alpha
-            for row in records:
-                alpha_rows.append(
-                    {"calibration_date": bundle.prices.dates[i].strftime("%Y-%m-%d"), **row}
-                )
+            choice = select_risk_alpha(
+                bundle, start_soc, i, FIXED_SCENARIO_K, log=True
+            )
+            calibrated[cal] = choice.selected_alpha
+            cal_date = bundle.prices.dates[i].strftime("%Y-%m-%d")
+            window_frame = pd.DataFrame(
+                [{"calibration_date": cal_date, **row} for row in choice.window_records]
+            )
+            daily_frame = pd.DataFrame(
+                [{"calibration_date": cal_date, **row} for row in choice.daily_records]
+            )
+            _append_csv(alpha_sel_path, window_frame)
+            if not daily_frame.empty:
+                _append_csv(alpha_daily_path, daily_frame)
             print(
-                f"Q4-2 calibrated alpha={alpha} at {bundle.prices.dates[i].strftime('%Y-%m-%d')}",
+                f"Q4-2 calibrated alpha={choice.selected_alpha} at {cal_date}",
                 flush=True,
             )
         elif i < RISK_WARMUP_DAYS:
@@ -104,8 +120,6 @@ def run_q4_2_campaign(
         )
         if date not in detail:
             del result
-    if alpha_rows:
-        pd.DataFrame(alpha_rows).to_csv(out_dir / "q4_2_alpha_selection.csv", index=False)
     return {"detail": detail, "end_soc": soc, "calibrated_alpha": calibrated}
 
 

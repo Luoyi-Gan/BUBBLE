@@ -5,6 +5,7 @@ February–December only. January is warmup. Does not modify result2.xlsx or res
 
 from __future__ import annotations
 
+import argparse
 import json
 import shutil
 import subprocess
@@ -211,15 +212,35 @@ def write_result4_3(by_date: dict[str, pd.DataFrame], dest: Path = RESULT4_3_XLS
     }
 
 
-def export_all() -> dict:
+def export_q4_2() -> dict:
     q42 = load_export_window(Q4_2_DISPATCH_DIR, q4_3=False)
-    q43 = load_export_window(Q4_3_DISPATCH_DIR, q4_3=True)
     r2 = write_result4_2(q42)
-    r3 = write_result4_3(q43)
     RESULT4_2_AUDIT.write_text(json.dumps(r2, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return {"result4_2": r2}
+
+
+def export_q4_3() -> dict:
+    q43 = load_export_window(Q4_3_DISPATCH_DIR, q4_3=True)
+    r3 = write_result4_3(q43)
     RESULT4_3_AUDIT.write_text(json.dumps(r3, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return {"result4_2": r2, "result4_3": r3}
+    return {"result4_3": r3}
+
+
+def export_all() -> dict:
+    out = {}
+    out.update(export_q4_2())
+    out.update(export_q4_3())
+    return out
 
 
 if __name__ == "__main__":
-    print(json.dumps(export_all(), ensure_ascii=False, indent=2))
+    parser = argparse.ArgumentParser(description="Export result4 workbooks")
+    parser.add_argument("--system", choices=("q4_2", "q4_3", "all"), default="all")
+    args = parser.parse_args()
+    if args.system == "q4_2":
+        report = export_q4_2()
+    elif args.system == "q4_3":
+        report = export_q4_3()
+    else:
+        report = export_all()
+    print(json.dumps(report, ensure_ascii=False, indent=2))

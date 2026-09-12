@@ -16,10 +16,16 @@ RESULT4_3_XLSX = ROOT / "output" / "result4-3.xlsx"
 
 RESIDUAL_POOL_DAYS = 28
 FIXED_SCENARIO_K = 8
+K_REVIEW_CANDIDATES = (4, 8, 12)
+K_REVIEW_REFERENCE_ALPHA = 0.60
+K_REVIEW_COST_TOLERANCE = 0.01
 RISK_ALPHA_CANDIDATES = (0.60, 0.70, 0.80, 0.90)
 RISK_CALIBRATION_DAYS = 14
 RISK_WARMUP_DAYS = 28
+ALPHA_POLICY_LOOP = "day_ahead_joint_q+locked_q+causal_mpc+next_day_value_cuts"
 PAM_SEED = 0
+PRICE_MONTHLY_CSV = OUTPUT_DIR / "q4_price_forecast_monthly.csv"
+PRICE_MONTHLY_JSON = OUTPUT_DIR / "q4_price_forecast_monthly.json"
 LOAD_INFORMATION_CASE = "causal_load_main"
 Q4_2_YEAR_END_RULE = "q2_accepted_no_hard_terminal"
 Q4_3_YEAR_END_BOUNDARY = "A_q2_aligned"

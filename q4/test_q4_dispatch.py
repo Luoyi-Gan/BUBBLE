@@ -118,6 +118,64 @@ class PriceLeakageReuseTests(unittest.TestCase):
         assert_no_future_price_leak(prices, dates, day_index=6, tau=0)
         assert_no_future_price_leak(prices, dates, day_index=6, tau=36)
 
+    def test_alpha_calibrator_uses_official_loop_not_full_day_actual(self) -> None:
+        import inspect
+
+        import q4.q4_2 as module
+
+        self.assertFalse(hasattr(module, "_validation_cost"))
+        source = inspect.getsource(module.select_risk_alpha)
+        window_src = inspect.getsource(module.run_candidate_window)
+        self.assertIn("run_q4_2_day", window_src)
+        self.assertNotIn("solve_fixed_q_dispatch", source)
+        self.assertNotIn("solve_fixed_q_dispatch", window_src)
+        self.assertIn("used_full_day_actual_scheduler", window_src)
+
+    def test_monthly_price_table_pools_rmse(self) -> None:
+        from q4.export_price_monthly import monthly_from_audit
+
+        frame = pd.DataFrame(
+            {
+                "date": ["2025-01-02", "2025-01-03", "2025-02-01"],
+                "day_ahead_mae": [0.2, 0.4, 0.6],
+                "day_ahead_rmse": [0.3, 0.5, 0.7],
+                "intraday_06_mae": [0.1, 0.3, 0.5],
+                "intraday_06_rmse": [0.2, 0.4, 0.6],
+                "intraday_12_mae": [0.1, 0.3, 0.5],
+                "intraday_12_rmse": [0.2, 0.4, 0.6],
+                "intraday_18_mae": [0.1, 0.3, 0.5],
+                "intraday_18_rmse": [0.2, 0.4, 0.6],
+                "mpc_remaining_mae_mean": [0.2, 0.4, 0.6],
+            }
+        )
+        monthly = monthly_from_audit(frame)
+        jan = monthly.loc[monthly["year_month"] == "2025-01"].iloc[0]
+        self.assertEqual(int(jan["n_days"]), 2)
+        self.assertAlmostEqual(float(jan["day_ahead_mae"]), 0.3)
+        self.assertAlmostEqual(float(jan["day_ahead_rmse"]), float(np.sqrt((0.3**2 + 0.5**2) / 2)))
+        annual = monthly.loc[monthly["year_month"] == "2025-annual"].iloc[0]
+        self.assertEqual(int(annual["n_days"]), 3)
+
+    def test_q2_calibration_calendar_has_25_windows(self) -> None:
+        from q4.q4_2 import q2_aligned_calibration_indices
+        from q4.run_k_review import decide_keep_k8
+
+        idx = q2_aligned_calibration_indices(365)
+        self.assertEqual(idx[0], 28)
+        self.assertEqual(idx[-1], 364)
+        self.assertEqual(len(idx), 25)
+        self.assertEqual(idx, list(range(28, 365, 14)))
+        stable = decide_keep_k8(
+            {
+                4: {"mean_cost_per_day_yuan": 101.0, "mean_elapsed_seconds": 0.5},
+                8: {"mean_cost_per_day_yuan": 100.0, "mean_elapsed_seconds": 0.8},
+                12: {"mean_cost_per_day_yuan": 99.5, "mean_elapsed_seconds": 1.2},
+            }
+        )
+        self.assertEqual(stable["keep_k"], 8)
+        self.assertTrue(stable["k8_stable"])
+        self.assertTrue(stable["k8_within_1pct_of_best"])
+
 
 @unittest.skipUnless(ATTACH4.exists(), "attachments unavailable")
 class AttachmentSmokeTests(unittest.TestCase):
@@ -184,6 +242,92 @@ class AttachmentSmokeTests(unittest.TestCase):
         other = bundle_with_prices(self.bundle, other_prices)
         hat2, _src2, _ch2 = day_ahead_as_of(other, 15, 14)
         np.testing.assert_allclose(hat, hat2, atol=1e-12)
+
+
+@unittest.skipUnless(ATTACH4.exists(), "attachments unavailable")
+class AlphaCalibrationLoopTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from q4.bundle import load_q4_bundle
+
+        cls.bundle = load_q4_bundle(compute_price_mpc=False)
+
+    def test_candidate_chains_own_soc_from_deployed_start(self) -> None:
+        from q4.q4_2 import run_candidate_window, select_risk_alpha
+
+        start = np.full(self.bundle.n_days(), np.nan)
+        start[14] = 6000.0
+        start[15] = 7000.0
+        choice = select_risk_alpha(
+            self.bundle,
+            start,
+            16,
+            8,
+            n_validation=2,
+            alphas=(0.60, 0.90),
+            log=False,
+        )
+        self.assertEqual(len(choice.window_records), 2)
+        for row in choice.window_records:
+            self.assertFalse(row["used_full_day_actual_scheduler"])
+            self.assertTrue(row["no_future_info"])
+            self.assertIn("total_planned_fee_yuan", row)
+            self.assertIn("total_emergency_fee_yuan", row)
+            self.assertIn("total_unused_quota_kwh", row)
+            self.assertIn("daily_soc_end_path_kwh", row)
+            self.assertTrue(row["all_value_cuts_present"])
+            self.assertEqual(int(row["validation_days"]), 2)
+        by_alpha = {
+            float(row["risk_alpha"]): [
+                d for d in choice.daily_records if abs(float(d["risk_alpha"]) - float(row["risk_alpha"])) < 1e-12
+            ]
+            for row in choice.window_records
+        }
+        for alpha, days in by_alpha.items():
+            self.assertEqual(len(days), 2, alpha)
+            self.assertAlmostEqual(days[0]["soc_start_kwh"], 6000.0, places=6)
+            self.assertAlmostEqual(days[1]["soc_start_kwh"], days[0]["soc_end_kwh"], places=6)
+            self.assertNotAlmostEqual(days[1]["soc_start_kwh"], 7000.0, places=3)
+            self.assertTrue(days[0]["has_value_cuts"])
+            self.assertGreater(len(days[0]["soc_end_path_kwh"].split(";")), 1)
+            self.assertIn("planned_fee_yuan", days[0])
+            self.assertIn("emergency_fee_yuan", days[0])
+            self.assertIn("unused_quota_kwh", days[0])
+            self.assertFalse(days[0]["used_full_day_actual_scheduler"])
+        self.assertIn(choice.selected_alpha, (0.60, 0.90))
+        ranked = sorted(
+            choice.window_records,
+            key=lambda row: (row["mean_validation_cost_yuan"], row["risk_alpha"]),
+        )
+        self.assertTrue(ranked[0]["selected"])
+        self.assertEqual(choice.selected_alpha, float(ranked[0]["risk_alpha"]))
+
+        daily, summary = run_candidate_window(
+            self.bundle, start, 16, risk_alpha=0.60, k_target=8, n_validation=2
+        )
+        self.assertEqual(len(daily), 2)
+        self.assertAlmostEqual(summary["soc_window_start_kwh"], 6000.0, places=6)
+
+    def test_future_actuals_do_not_change_alpha_calibration(self) -> None:
+        from q4.info_set import probe_alpha_calibration_invariance
+
+        start = np.full(self.bundle.n_days(), 6000.0)
+        report = probe_alpha_calibration_invariance(
+            self.bundle,
+            start,
+            16,
+            k_target=8,
+            n_validation=1,
+            alphas=(0.60, 0.90),
+        )
+        self.assertTrue(report["pass"], report)
+        self.assertTrue(report["alpha_invariant"], report)
+        self.assertTrue(report["cost_invariant"], report)
+        self.assertLess(report["max_mean_cost_abs_diff_yuan"], 1e-6)
+        from q4.audit import write_json
+        from q4.config import OUTPUT_DIR
+
+        write_json(OUTPUT_DIR / "q4_2_alpha_info_set_audit.json", report)
 
 
 if __name__ == "__main__":
