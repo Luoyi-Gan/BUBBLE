@@ -65,9 +65,6 @@ def main() -> None:
     missing_figs = [name for name in REQUIRED_FIGS if not (ANNUAL_FIG_DIR / name).exists()]
     if missing_figs:
         raise SystemExit(f"missing figures: {missing_figs}")
-    if (ROOT / "output" / "result3.xlsx").exists():
-        raise SystemExit("result3.xlsx must not be written by the annual run")
-
     audit = json.loads((out / "q3_annual_physical_audit.json").read_text(encoding="utf-8"))
     daily = pd.read_csv(out / "q3_annual_daily_summary.csv")
     totals = pd.read_csv(out / "q3_annual_strategy_comparison.csv")
@@ -155,7 +152,7 @@ def main() -> None:
         "",
         "主口径固定 `causal_load_main` + `linear_anchor_main` + `anchor_final_main`。",
         "A、B 是两条彼此独立的 365 日路径，各自从 2025-01-01 的 6000 kWh 出发，不共享 SOC。",
-        "**不**生成 `result3.xlsx`，**不**实现 M5，**不**把两案平均成一个主结论。",
+        "10 路年度比较归档本身**不**负责生成 `result3.xlsx`（正式表由 `q3/run_q3_result3_export.py` 在授权后单独导出），**不**实现 M5，**不**把两案平均成一个主结论。",
         "",
         "## 运行",
         "",

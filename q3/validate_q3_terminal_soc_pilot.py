@@ -71,9 +71,6 @@ def main() -> None:
     missing_figs = [name for name in REQUIRED_FIGS if not (TERMINAL_SOC_FIG_DIR / name).exists()]
     if missing_figs:
         raise SystemExit(f"missing figures: {missing_figs}")
-    if (ROOT / "output" / "result3.xlsx").exists():
-        raise SystemExit("result3.xlsx must not be written by this pilot")
-
     audit = json.loads((out / "q3_physical_audit.json").read_text(encoding="utf-8"))
     daily = pd.read_csv(out / "q3_terminal_soc_daily.csv")
     totals = pd.read_csv(out / "q3_terminal_soc_strategy_totals.csv")
