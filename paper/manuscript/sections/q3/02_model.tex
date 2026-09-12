@@ -80,4 +80,4 @@ J_{\tau}^{\mathrm{free}}&=\min\{J_{d,\tau}:g_{d,t}\ge0,\ t\in\mathcal T_\tau\},\
 \operatorname{VoI}_{\tau}&=J_{\tau}^{\mathrm{fix}}-J_{\tau}^{\mathrm{free}}.
 \label{eq:q3-voi}
 \end{align}
-当 $\operatorname{VoI}_{\tau}>\varepsilon$ 时实施新承诺，否则维持 $g^{\mathrm{pre}}$；$\varepsilon=0.01$ 元仅用于屏蔽数值舍入引起的无意义微调。以 M0 表示 $0{:}00$ 后不调整，以 M1/M6 表示三个更新点均评估并按式\eqref{eq:q3-voi}实施，以 $M_6$、$M_{12}$、$M_{18}$ 表示仅开放一个更新点的消融策略。它们共同回答后续预报是否有价值，以及何时更新最有效。
+当 $\operatorname{VoI}_{\tau}>\varepsilon$ 时实施新承诺，否则维持 $g^{\mathrm{pre}}$；$\varepsilon=0.01$ 元仅用于屏蔽数值舍入引起的无意义微调。本文将日初计划不再调整的基准称为“不调整策略（M0）”，将三个更新点均评估并按式\eqref{eq:q3-voi}实施的方案称为“全时点价值触发策略（M1/M6）”；另以 $M_6$、$M_{12}$、$M_{18}$ 表示只开放相应单一更新点的消融策略。它们共同回答后续预报是否有价值，以及何时更新最有效。
