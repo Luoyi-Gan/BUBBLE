@@ -1,0 +1,127 @@
+{
+  "all_pass": true,
+  "physical": {
+    "all_pass": true,
+    "n_failed_days": 0,
+    "failures": []
+  },
+  "continuity": {
+    "all_pass": true,
+    "paths": [
+      {
+        "strategy": "M0",
+        "year_end_boundary": "A_q2_aligned",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 1200.0,
+        "year_end_target_kwh": 1200.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      },
+      {
+        "strategy": "M12_only",
+        "year_end_boundary": "A_q2_aligned",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 1200.0,
+        "year_end_target_kwh": 1200.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      },
+      {
+        "strategy": "M18_only",
+        "year_end_boundary": "A_q2_aligned",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 1200.0,
+        "year_end_target_kwh": 1200.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      },
+      {
+        "strategy": "M1_M6",
+        "year_end_boundary": "A_q2_aligned",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 1200.0,
+        "year_end_target_kwh": 1200.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      },
+      {
+        "strategy": "M6_only",
+        "year_end_boundary": "A_q2_aligned",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 1200.0,
+        "year_end_target_kwh": 1200.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      },
+      {
+        "strategy": "M0",
+        "year_end_boundary": "B_energy_neutral",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 6000.0,
+        "year_end_target_kwh": 6000.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      },
+      {
+        "strategy": "M12_only",
+        "year_end_boundary": "B_energy_neutral",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 6000.0,
+        "year_end_target_kwh": 6000.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      },
+      {
+        "strategy": "M18_only",
+        "year_end_boundary": "B_energy_neutral",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 6000.0,
+        "year_end_target_kwh": 6000.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      },
+      {
+        "strategy": "M1_M6",
+        "year_end_boundary": "B_energy_neutral",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 6000.0,
+        "year_end_target_kwh": 6000.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      },
+      {
+        "strategy": "M6_only",
+        "year_end_boundary": "B_energy_neutral",
+        "n_days": 365,
+        "start_soc_kwh": 6000.0,
+        "end_soc_kwh": 6000.0,
+        "year_end_target_kwh": 6000.0,
+        "max_cross_day_soc_gap_kwh": 0.0,
+        "pass": true
+      }
+    ]
+  },
+  "n_day_runs": 3650,
+  "n_paths": 10,
+  "start_date": "2025-01-01",
+  "end_date": "2025-12-31",
+  "jan01_soc_kwh": 6000.0,
+  "pv_mapping_mode": "linear_anchor_main",
+  "settlement_mode": "anchor_final_main",
+  "load_information_case": "causal_load_main",
+  "boundaries_run": [
+    "A_q2_aligned",
+    "B_energy_neutral"
+  ],
+  "note": "A and B are independent 365-day campaigns. This archive does not choose a single official year-end boundary and does not write result3.xlsx. Mapping/settlement annual sensitivities are not included in this run.",
+  "elapsed_seconds_this_process": 14993.231821100002
+}

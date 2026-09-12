@@ -1,0 +1,23 @@
+{
+  "date": "2025-02-01",
+  "perturbed_slice": "periods[36:] (unrealized same-day actual load after 06:00)",
+  "perturbation_kwh": 500.0,
+  "source_dates": "2025-01-04;2025-01-11;2025-01-18;2025-01-25",
+  "source_dates_after_perturbation": "2025-01-04;2025-01-11;2025-01-18;2025-01-25",
+  "main_day_ahead_forecast_unchanged": true,
+  "main_update_forecast_unchanged": true,
+  "main_next_day_forecast_unchanged": true,
+  "main_g0_unchanged": true,
+  "proxy_planning_load_changed": true,
+  "proxy_g0_changed": true,
+  "max_abs_main_forecast_delta_kwh": 0.0,
+  "max_abs_main_update_forecast_delta_kwh": 0.0,
+  "max_abs_main_g0_delta_kwh": 0.0,
+  "max_abs_proxy_planning_delta_kwh": 500.0000000000001,
+  "max_abs_proxy_g0_delta_kwh": 1712.2941083333333,
+  "max_abs_next_day_forecast_delta_kwh": 0.0,
+  "source_indices_unchanged": true,
+  "six_am_first_mutable_index": 36,
+  "note": "causal_load_main day-ahead and 6/12/18 future load stay at the 0:00 hat. actual_load_proxy is allowed to change because it reads the full same-day Attachment 2 path.",
+  "all_pass": true
+}
