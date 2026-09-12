@@ -28,5 +28,22 @@
   "pilot_dates": [
     "2025-02-01",
     "2025-06-21"
-  ]
+  ],
+  "price_oracle": {
+    "annual_yuan": 17313064.403097387,
+    "export_yuan": 15186106.863616643,
+    "end_soc_kwh": 1200.0,
+    "gap_vs_main_annual_yuan": -176743.83398309723,
+    "note": "Offline reference only: midnight and remaining-horizon prices are today's actual path. Next-day value cuts stay causal. Not executable."
+  },
+  "two_day": {
+    "2025-02-01": {
+      "main_yuan": 18917.033334551164,
+      "oracle_yuan": 17933.123936862197
+    },
+    "2025-06-21": {
+      "main_yuan": 21776.976238659478,
+      "oracle_yuan": 22053.278842121785
+    }
+  }
 }
