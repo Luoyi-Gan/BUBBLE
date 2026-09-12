@@ -1,3 +1,74 @@
-% 问题4：模型建立。建模思路已完成，先撰写方法；求解结果待计算。
-% 仅写本部分正文；不写 documentclass/begin document/一级标题。
-% 本文件与独立审阅入口及主文档共享；审核前不要打开 assembly.tex 的 Ready 开关。
+\subsubsection{交付价结算与信息集}
+
+Q4 不改变题给设备与效率，也不引入售电、退化或需求响应。普通购电仍锁定为时段额度：Q4-2 的 $q_{d,t}$ 在 0:00 确定，按 $p_{d,t}q_{d,t}$ 计费；Q4-3 的 $g^0_{d,t}$ 在 0:00 确定，后续仅在 6:00、12:00、18:00 评估是否调整未执行承诺，结算函数仍为
+\begin{equation}
+\phi_{d,t}(g^0,g^F)=p_{d,t}g^F+\tfrac12 p_{d,t}|g^F-g^0|,
+\label{eq:q4-settlement}
+\end{equation}
+紧急购电按 $5p_{d,t}e_{d,t}$ 计入。该口径把“计划市场锁价”明确排除在题设数据之外，避免引入附件未给出的合约变量。
+
+为可审核地定义“实时”，本文采用保守端点约定：带标签 $t$ 的实际价格、负荷与光伏只在该时段结束后进入信息集；因此 6:00 更新可使用截至 6:00 的记录，新计划从 6:10 起生效。任一决策必须是 $\mathcal I_{d,\tau}$ 的函数，其中 $\mathcal I_{d,\tau}$ 不含当天 $\tau$ 之后的附件 2/3/4 实际值。
+
+\subsubsection{因果价格预测}
+
+日初构造三条候选价格路径：前一日同刻 $\widehat p^{(1)}_{d,t}=p_{d-1,t}$；最近 $m\in\{2,4\}$ 个同星期历史日的逐时段均值 $\widehat p^{(m)}_{d,t}$。在日期严格早于 $d$ 的已结束日上，以累计 MAE 在线选择候选 $a_d$，得到基准 $\widehat p^0_{d,t}$；历史不足时回退到唯一可得的前一日曲线。该规则固定，不得用全年误差事后挑选窗口。
+
+在更新时点 $\tau$，用已结束前缀的平均基准残差
+\begin{equation}
+z_{d,\tau}=\frac1{\tau}\sum_{s=1}^{\tau}\left(p_{d,s}-\widehat p^0_{d,s}\right)
+\label{eq:q4-price-prefix}
+\end{equation}
+与严格早于 $d$ 的历史日拟合带截距 OLS，预测剩余价格
+\begin{equation}
+\widehat p_{d,t\mid\tau}
+=\max\left\{0,\widehat p^0_{d,t}+\alpha_{\tau,t}+\beta_{\tau,t}z_{d,\tau}\right\},\quad t>\tau.
+\label{eq:q4-price-ols}
+\end{equation}
+样本不足或解释变量零方差时令 $\beta_{\tau,t}=0$，只保留历史平均残差；截断为零仅体现价格非负，不能解释为售电收益。
+
+负荷与光伏预测完全继承 Q2/Q3 主口径：负荷为最近至多四个同星期历史日均值；Q4-2 光伏沿用 Q2 因果基准与后验残差更新；Q4-3 在 0:00、6:00、12:00、18:00 使用附件 3 当次预报，并以更新时点已观测光伏为锚点做线性插值。
+
+\subsubsection{Q4-2：三元联合残差与日前—日内分工}
+
+对历史日 $j<d$，在当日可得预测存档下构造三元残差
+\begin{equation}
+\left(r^L_{j,t},r^P_{j,t},r^p_{j,t}\right)
+=\left(L_{j,t}-\widehat L_{j,t},\ P_{j,t}-\widehat P_{j,t},\ p_{j,t}-\widehat p^0_{j,t}\right).
+\label{eq:q4-triple-residual}
+\end{equation}
+在最近至多 28 个完整残差日上，以标准化欧氏距离做 PAM/K-medoids，取 $K=8$ 条代表路径，概率为簇占比。第 $k$ 条路径给出
+\begin{equation}
+L^{(k)}_{d,t}=\max(0,\widehat L_{d,t}+r^L_{m_k,t}),\ 
+P^{(k)}_{d,t}=\max(0,\widehat P_{d,t}+r^P_{m_k,t}),\ 
+p^{(k)}_{d,t}=\max(0,\widehat p^0_{d,t}+r^p_{m_k,t}).
+\label{eq:q4-scenario-path}
+\end{equation}
+同一历史日的三条残差必须配对，不允许独立洗牌。
+
+日初在全部代表路径上选择共享的 $q_{d,t}$，目标为
+\begin{equation}
+\min \sum_{k=1}^{8}\pi_{d,k}\sum_{t=1}^{T}
+\left(p^{(k)}_{d,t}q_{d,t}+5p^{(k)}_{d,t}e^{(k)}_{d,t}\right)
++\sum_{k=1}^{8}\pi_{d,k}V^{(k)}_{d+1}(E^{(k)}_{d,T}),
+\label{eq:q4-2-dayahead}
+\end{equation}
+并施加 Q2 的滚动风险分位储备下界。该优化只用于\textbf{计划筛选}：路径内储能轨迹评估共同 $q$ 的可行性，不是可直接下发的控制指令。
+
+对已锁定的 $q$，日内每个十分钟末观测实际 $(L,P,p)$ 与 SOC，按 Q2 规则更新后验权重，对 $t>\tau$ 用式\eqref{eq:q4-scenario-path} 的条件均值修正剩余预测，在 $q$ 不变的前提下滚动求解并只执行第一步。实现成本为
+\begin{equation}
+C^{4\text{-}2}_d=\sum_t\left(p_{d,t}q_{d,t}+5p_{d,t}e_{d,t}\right).
+\label{eq:q4-2-actual-cost}
+\end{equation}
+只有式\eqref{eq:q4-2-actual-cost}用于结论，日前情景目标不得替代实际账单。
+
+\subsubsection{Q4-3：固定 \texttt{M1\_M6} 与价值触发调整}
+
+Q4-3 不重新选择 Q3 策略，固定 \texttt{M1\_M6}。0:00 以 $(\widehat L,\widehat P^0,\widehat p^0)$ 求 $g^0$ 与储能预案；在 $\tau\in\{6{:}00,12{:}00,18{:}00\}$，对未执行时段分别计算固定承诺与自由调整的两个剩余时域最优值 $J^{\mathrm{fix}}_\tau,J^{\mathrm{free}}_\tau$，令 $VoI_\tau=J^{\mathrm{fix}}_\tau-J^{\mathrm{free}}_\tau$。仅当 $VoI_\tau$ 超过求解器货币容差时才采用自由解。预测阶段使用 $\widehat p_{d,t\mid\tau}$ 与式\eqref{eq:q4-settlement} 的预测结算函数；实现阶段按实际 $p_{d,t}$ 重算
+\begin{equation}
+C^{4\text{-}3}_d=\sum_t\left[\phi_{d,t}(g^0_{d,t},g^F_{d,t})+5p_{d,t}e_{d,t}\right].
+\label{eq:q4-3-actual-cost}
+\end{equation}
+
+\subsubsection{方法边界}
+
+本文不把 CVaR 风险厌恶、深度网络价格预测或 0:00 已知全天实际价格的 \texttt{price\_oracle} 纳入主方案；它们最多作为解释边界或敏感性。Q4 的表述边界是“三元联合残差日前评估 + 因果 MPC 执行”，而不是全信息多阶段随机最优控制。

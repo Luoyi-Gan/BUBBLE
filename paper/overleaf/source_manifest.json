@@ -16,7 +16,7 @@
     "q1": "method_and_data_done__paper_integrated",
     "q2": "policy_consistent_tables_figures_exported__paper_integrated",
     "q3": "annual_tables_figures_exported__paper_integrated",
-    "q4": "running__paper_results_blocked"
+    "q4": "method_written__results_blocked_until_rq4_c1"
   },
   "paper_assets_script": "scripts/export_paper_q2_q3.py",
   "paper_assets_audit": "paper/overleaf/paper_assets_audit.json"
