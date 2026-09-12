@@ -38,6 +38,7 @@ def run_q4_2_campaign(
     end_index: int,
     detail_dates: tuple[str, ...] = PILOT_DATES,
     out_dir: Path = OUTPUT_DIR,
+    write_all_dispatch: bool = False,
 ) -> dict:
     Q4_2_DISPATCH_DIR.mkdir(parents=True, exist_ok=True)
     daily_path = out_dir / "q4_2_warmup_daily.csv"
@@ -59,20 +60,26 @@ def run_q4_2_campaign(
             alpha, records = select_risk_alpha(bundle, start_soc, i, FIXED_SCENARIO_K)
             calibrated[cal] = alpha
             for row in records:
-                alpha_rows.append({"calibration_date": bundle.prices.dates[i].strftime("%Y-%m-%d"), **row})
-            print(f"Q4-2 calibrated alpha={alpha} at {bundle.prices.dates[i].strftime('%Y-%m-%d')}", flush=True)
+                alpha_rows.append(
+                    {"calibration_date": bundle.prices.dates[i].strftime("%Y-%m-%d"), **row}
+                )
+            print(
+                f"Q4-2 calibrated alpha={alpha} at {bundle.prices.dates[i].strftime('%Y-%m-%d')}",
+                flush=True,
+            )
         elif i < RISK_WARMUP_DAYS:
             calibrated.setdefault(cal, None)
         alpha = alpha_for_day(i, calibrated)
         date = bundle.prices.dates[i].strftime("%Y-%m-%d")
-        write_path = Q4_2_DISPATCH_DIR / f"dispatch_{date}.csv" if date in detail_dates else None
+        keep = write_all_dispatch or date in detail_dates
+        write_path = Q4_2_DISPATCH_DIR / f"dispatch_{date}.csv" if keep else None
         result = run_q4_2_day(bundle, i, soc, alpha, write_dispatch=write_path)
         soc = float(result.summary["soc_end_kwh"])
         _append_csv(daily_path, pd.DataFrame([result.summary]))
         _append_csv(ahead_path, pd.DataFrame([result.day_ahead_audit]))
         if result.scenario_rows:
             _append_csv(scen_path, pd.DataFrame(result.scenario_rows))
-        if date in detail_dates:
+        if keep:
             nrm = result.dispatch["actual_price"] * result.dispatch["q_or_g0_kwh"]
             emg = 5.0 * result.dispatch["actual_price"] * result.dispatch["emergency_kwh"]
             _append_csv(
@@ -88,13 +95,15 @@ def run_q4_2_campaign(
                     }
                 ),
             )
-            detail[date] = result
+            if date in detail_dates:
+                detail[date] = result
         print(
             f"Q4-2 [{i+1}/{end_index+1}] {date} cost={result.summary['total_cost_yuan']:.2f} "
             f"soc={soc:.2f} K={result.summary['k_effective']} alpha={alpha}",
             flush=True,
         )
-        del result
+        if date not in detail:
+            del result
     if alpha_rows:
         pd.DataFrame(alpha_rows).to_csv(out_dir / "q4_2_alpha_selection.csv", index=False)
     return {"detail": detail, "end_soc": soc, "calibrated_alpha": calibrated}
@@ -105,6 +114,7 @@ def run_q4_3_campaign(
     end_index: int,
     detail_dates: tuple[str, ...] = PILOT_DATES,
     out_dir: Path = OUTPUT_DIR,
+    write_all_dispatch: bool = False,
 ) -> dict:
     Q4_3_DISPATCH_DIR.mkdir(parents=True, exist_ok=True)
     daily_path = out_dir / "q4_3_warmup_daily.csv"
@@ -118,20 +128,13 @@ def run_q4_3_campaign(
     detail = {}
     for i in range(end_index + 1):
         date = bundle.prices.dates[i].strftime("%Y-%m-%d")
+        keep = write_all_dispatch or date in detail_dates
         result = run_q4_3_day(bundle, i, soc, value_cut_cache=cache)
         soc = float(result.summary["soc_end_kwh"])
         _append_csv(daily_path, pd.DataFrame([result.summary]))
         _append_csv(update_path, result.update_log)
-        if date in detail_dates:
+        if keep:
             result.dispatch.to_csv(Q4_3_DISPATCH_DIR / f"dispatch_{date}.csv", index=False)
-            pd.DataFrame(
-                {
-                    "date": date,
-                    "period_index": np.arange(len(result.g0)),
-                    "g0_kwh": result.g0,
-                    "g_final_kwh": result.g_final,
-                }
-            ).to_csv(out_dir / f"q4_3_commitment_versions_{date}.csv", index=False)
             ledger = result.dispatch[
                 ["date", "period_index", "normal_cost_yuan", "adjustment_cost_yuan", "emergency_cost_yuan"]
             ].copy()
@@ -141,13 +144,23 @@ def run_q4_3_campaign(
                 + ledger["emergency_cost_yuan"]
             )
             _append_csv(ledger_path, ledger)
-            detail[date] = result
+            if date in detail_dates:
+                pd.DataFrame(
+                    {
+                        "date": date,
+                        "period_index": np.arange(len(result.g0)),
+                        "g0_kwh": result.g0,
+                        "g_final_kwh": result.g_final,
+                    }
+                ).to_csv(out_dir / f"q4_3_commitment_versions_{date}.csv", index=False)
+                detail[date] = result
         print(
             f"Q4-3 [{i+1}/{end_index+1}] {date} cost={result.summary['total_cost_yuan']:.2f} "
             f"soc={soc:.2f} adj={result.summary['adjustment_count']}",
             flush=True,
         )
-        del result
+        if date not in detail:
+            del result
     return {"detail": detail, "end_soc": soc, "pam_seed": PAM_SEED}
 
 
