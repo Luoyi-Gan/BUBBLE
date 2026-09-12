@@ -30,6 +30,7 @@ from q4.bundle import load_q4_bundle  # noqa: E402
 from q4.campaign import (  # noqa: E402
     last_index_for_dates,
     load_q42_detail_from_disk,
+    load_q43_detail_from_disk,
     run_q4_2_campaign,
     run_q4_3_campaign,
 )
@@ -106,6 +107,7 @@ def _audit_detail(q42, q43):
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Q4-2/Q4-3 two-day regression")
     parser.add_argument("--skip-q4-2", action="store_true", help="reuse streamed Q4-2 CSVs")
+    parser.add_argument("--skip-q4-3", action="store_true", help="reuse streamed Q4-3 CSVs")
     parser.add_argument("--skip-tests", action="store_true", help="skip the unittest pre-check")
     args = parser.parse_args(argv)
     started = perf_counter()
@@ -125,7 +127,11 @@ def main(argv: list[str] | None = None) -> None:
         print("Reusing Q4-2 dispatch CSVs from disk", flush=True)
     else:
         q42 = run_q4_2_campaign(bundle, end_index, PILOT_DATES, OUTPUT_DIR)
-    q43 = run_q4_3_campaign(bundle, end_index, PILOT_DATES, OUTPUT_DIR)
+    if args.skip_q4_3:
+        q43 = load_q43_detail_from_disk(OUTPUT_DIR, PILOT_DATES)
+        print("Reusing Q4-3 dispatch CSVs from disk", flush=True)
+    else:
+        q43 = run_q4_3_campaign(bundle, end_index, PILOT_DATES, OUTPUT_DIR)
     phys2, phys3, all_pass = _audit_detail(q42["detail"], q43["detail"])
     soc2 = warmup_soc_continuity(pd.read_csv(OUTPUT_DIR / "q4_2_warmup_daily.csv"))
     soc3 = warmup_soc_continuity(pd.read_csv(OUTPUT_DIR / "q4_3_warmup_daily.csv"))
@@ -174,6 +180,7 @@ def main(argv: list[str] | None = None) -> None:
         "q4_3_all_pass": phys3["all_pass"],
         "all_pass": all_pass,
         "skip_q4_2": bool(args.skip_q4_2),
+        "skip_q4_3": bool(args.skip_q4_3),
         "note": (
             "Two-day regression only. January through each target date is causal "
             "SOC warmup. result4-2/result4-3 are not written in this stage."

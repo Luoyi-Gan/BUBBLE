@@ -1,0 +1,34 @@
+{
+  "days": {
+    "2025-02-01": {
+      "n_periods": 144,
+      "max_balance_residual_kwh": 1.1368683772161605e-13,
+      "soc_min_kwh": 1902.5490761253045,
+      "soc_max_kwh": 10799.999999760685,
+      "max_x_minus_cap_kwh": 0.0,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "n_rows": 144,
+      "pass": true,
+      "ledger_recompute_yuan": 19757.45854298777,
+      "ok": true
+    },
+    "2025-06-21": {
+      "n_periods": 144,
+      "max_balance_residual_kwh": 1.1368683772161605e-13,
+      "soc_min_kwh": 1255.9051337565568,
+      "soc_max_kwh": 10799.99999979256,
+      "max_x_minus_cap_kwh": 0.0,
+      "max_simultaneous_cd_kwh2": 0.0,
+      "n_rows": 144,
+      "pass": true,
+      "ledger_recompute_yuan": 22322.360980950292,
+      "ok": true
+    }
+  },
+  "all_pass": true,
+  "soc_continuity": {
+    "n_days": 172,
+    "max_soc_gap_kwh": 0.0,
+    "pass": true
+  }
+}

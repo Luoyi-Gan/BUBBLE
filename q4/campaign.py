@@ -176,3 +176,36 @@ def load_q42_detail_from_disk(
             day_ahead_audit={},
         )
     return {"detail": detail, "end_soc": float(daily["soc_end_kwh"].iloc[-1]), "from_disk": True}
+
+
+def load_q43_detail_from_disk(
+    out_dir: Path = OUTPUT_DIR,
+    detail_dates: tuple[str, ...] = PILOT_DATES,
+) -> dict:
+    """Rebuild the in-memory Q4-3 pilot detail from streamed CSVs."""
+    from q4.q4_3 import Q43DayResult
+
+    daily = pd.read_csv(out_dir / "q4_3_warmup_daily.csv")
+    updates = pd.read_csv(out_dir / "q4_3_update_log.csv")
+    detail = {}
+    for date in detail_dates:
+        dispatch = pd.read_csv(Q4_3_DISPATCH_DIR / f"dispatch_{date}.csv")
+        row = daily.loc[daily["date"] == date].iloc[0].to_dict()
+        versions = out_dir / f"q4_3_commitment_versions_{date}.csv"
+        if versions.exists():
+            ver = pd.read_csv(versions)
+            g0 = ver["g0_kwh"].to_numpy(float)
+            g_final = ver["g_final_kwh"].to_numpy(float)
+        else:
+            g0 = dispatch["q_or_g0_kwh"].to_numpy(float)
+            g_final = dispatch["g_final_kwh"].to_numpy(float)
+        detail[date] = Q43DayResult(
+            date=date,
+            day_index=int(row["day_index"]),
+            g0=g0,
+            g_final=g_final,
+            dispatch=dispatch,
+            update_log=updates.loc[updates["date"] == date].copy(),
+            summary=row,
+        )
+    return {"detail": detail, "end_soc": float(daily["soc_end_kwh"].iloc[-1]), "from_disk": True}

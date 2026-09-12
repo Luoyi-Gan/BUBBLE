@@ -91,7 +91,8 @@ def probe_executed_prefix(
         bundle, perturb_unended_and_future(bundle.prices.price, day_index, tau)
     )
     r2 = run_q4_2_day(other, day_index, initial_soc, risk_alpha)
-    r3 = run_q4_3_day(other, day_index, initial_soc)
+    soc_q43 = float(q43_result.summary["soc_start_kwh"])
+    r3 = run_q4_3_day(other, day_index, soc_q43)
     cols = ["q_or_g0_kwh", "x_kwh", "charge_kwh", "discharge_kwh", "emergency_kwh"]
     d2 = q42_dispatch.iloc[:tau][cols].to_numpy(float)
     d2p = r2.dispatch.iloc[:tau][cols].to_numpy(float)
