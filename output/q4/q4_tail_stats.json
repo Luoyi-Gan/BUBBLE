@@ -1,0 +1,131 @@
+{
+  "price_note": "公平对比窗口为 2025-02-01 至 2025-12-31（334 日），设备、SOC 规则与负荷/光伏主案例相同；Q2/Q3 使用附件1 分时电价，Q4 使用附件4 变动电价。对比解释为同一套储能在不同价格信息下的运行结果，不是同一电价序列下的会计差额。",
+  "price_errors": {
+    "export_2_12": {
+      "start": "2025-02-01",
+      "end": "2025-12-31",
+      "n_days": 334,
+      "n_days_with_day_ahead": 334,
+      "day_ahead_mae": 0.04515284535096469,
+      "day_ahead_rmse_pooled": 0.06382976510997766,
+      "day_ahead_rmse_mean_daily": 0.05895297579483447,
+      "intraday_06_mae": 0.04686274713488956,
+      "intraday_12_mae": 0.04354047679498867,
+      "intraday_18_mae": 0.04046207171624772,
+      "aggregation": "MAE = mean of daily MAE; pooled RMSE = sqrt(mean of daily RMSE squared); equal slot count per day with a finite day-ahead forecast"
+    },
+    "annual_1_12": {
+      "start": "2025-01-01",
+      "end": "2025-12-31",
+      "n_days": 365,
+      "n_days_with_day_ahead": 364,
+      "day_ahead_mae": 0.04614900793650789,
+      "day_ahead_rmse_pooled": 0.06627754708047609,
+      "day_ahead_rmse_mean_daily": 0.059726433673098205,
+      "intraday_06_mae": 0.047294707203961575,
+      "intraday_12_mae": 0.04379997883633175,
+      "intraday_18_mae": 0.04054280045107427,
+      "aggregation": "MAE = mean of daily MAE; pooled RMSE = sqrt(mean of daily RMSE squared); equal slot count per day with a finite day-ahead forecast"
+    }
+  },
+  "rows": [
+    {
+      "scheme": "Q4-2",
+      "window": "1-12",
+      "n_days": 365,
+      "total_cost_yuan": 17681029.09881317,
+      "emergency_cost_yuan": 2530441.45785683,
+      "emergency_kwh": 635045.107114312,
+      "max_day_cost_yuan": 220012.7628227721,
+      "max_day_cost_date": "2025-01-01",
+      "max_emergency_cost_date": "2025-01-01",
+      "p90_yuan": 73781.77320534605,
+      "p95_yuan": 84459.76146174187,
+      "cvar_0_90_yuan": 92343.75614164564
+    },
+    {
+      "scheme": "Q4-2",
+      "window": "2-12",
+      "n_days": 334,
+      "total_cost_yuan": 15257873.753971763,
+      "emergency_cost_yuan": 2044500.3153429125,
+      "emergency_kwh": 541155.3930922948,
+      "max_day_cost_yuan": 103438.6149215319,
+      "max_day_cost_date": "2025-12-02",
+      "max_emergency_cost_date": "2025-06-01",
+      "p90_yuan": 69982.07031382488,
+      "p95_yuan": 74286.96427647672,
+      "cvar_0_90_yuan": 78128.4473155518
+    },
+    {
+      "scheme": "Q4-3",
+      "window": "1-12",
+      "n_days": 365,
+      "total_cost_yuan": 17489808.237080485,
+      "emergency_cost_yuan": 3035527.743312141,
+      "emergency_kwh": 749591.9375883166,
+      "max_day_cost_yuan": 137525.70452595604,
+      "max_day_cost_date": "2025-01-05",
+      "max_emergency_cost_date": "2025-01-05",
+      "p90_yuan": 75554.36925579648,
+      "p95_yuan": 86219.54175976907,
+      "cvar_0_90_yuan": 92761.571088819
+    },
+    {
+      "scheme": "Q4-3",
+      "window": "2-12",
+      "n_days": 334,
+      "total_cost_yuan": 15346418.13891758,
+      "emergency_cost_yuan": 2577371.6849955684,
+      "emergency_kwh": 651103.3835917715,
+      "max_day_cost_yuan": 105807.17148781056,
+      "max_day_cost_date": "2025-07-01",
+      "max_emergency_cost_date": "2025-07-01",
+      "p90_yuan": 73653.02097692988,
+      "p95_yuan": 82875.97929866644,
+      "cvar_0_90_yuan": 85248.00681130632
+    },
+    {
+      "scheme": "Q2-K8",
+      "window": "2-12",
+      "n_days": 334,
+      "total_cost_yuan": 14456670.549319457,
+      "emergency_cost_yuan": 1927579.7197312738,
+      "emergency_kwh": 534490.4162619049,
+      "max_day_cost_yuan": 84161.73501974324,
+      "max_day_cost_date": "2025-12-02",
+      "max_emergency_cost_date": "2025-06-01",
+      "p90_yuan": 61111.941543660316,
+      "p95_yuan": 64662.21726323267,
+      "cvar_0_90_yuan": 66708.12578483346
+    },
+    {
+      "scheme": "Q3-M1_M6",
+      "window": "2-12",
+      "n_days": 334,
+      "total_cost_yuan": 14512748.52796609,
+      "emergency_cost_yuan": 2405380.09739859,
+      "emergency_kwh": 641829.448557083,
+      "max_day_cost_yuan": 87309.30349920591,
+      "max_day_cost_date": "2025-07-06",
+      "max_emergency_cost_date": "2025-07-01",
+      "p90_yuan": 64342.70680621877,
+      "p95_yuan": 71381.87655677061,
+      "cvar_0_90_yuan": 72623.01470559392
+    },
+    {
+      "scheme": "Q3-M1_M6",
+      "window": "1-12",
+      "n_days": 365,
+      "total_cost_yuan": 16373508.74903882,
+      "emergency_cost_yuan": 2771035.553085873,
+      "emergency_kwh": 742322.8134101499,
+      "max_day_cost_yuan": 109974.63501225744,
+      "max_day_cost_date": "2025-01-02",
+      "max_emergency_cost_date": "2025-01-05",
+      "p90_yuan": 65706.5956065949,
+      "p95_yuan": 72411.5103265357,
+      "cvar_0_90_yuan": 77861.49903820896
+    }
+  ]
+}

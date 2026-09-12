@@ -129,26 +129,38 @@ def run_q4_3_campaign(
     detail_dates: tuple[str, ...] = PILOT_DATES,
     out_dir: Path = OUTPUT_DIR,
     write_all_dispatch: bool = False,
+    *,
+    price_mode: str = "causal",
+    dispatch_dir: Path | None = None,
+    daily_name: str = "q4_3_warmup_daily.csv",
+    update_name: str = "q4_3_update_log.csv",
+    ledger_name: str = "q4_3_cost_ledger.csv",
+    commitment_prefix: str = "q4_3_commitment_versions",
+    unlink_existing: bool = True,
 ) -> dict:
-    Q4_3_DISPATCH_DIR.mkdir(parents=True, exist_ok=True)
-    daily_path = out_dir / "q4_3_warmup_daily.csv"
-    update_path = out_dir / "q4_3_update_log.csv"
-    ledger_path = out_dir / "q4_3_cost_ledger.csv"
-    for path in (daily_path, update_path, ledger_path):
-        if path.exists():
-            path.unlink()
+    dest = Q4_3_DISPATCH_DIR if dispatch_dir is None else dispatch_dir
+    dest.mkdir(parents=True, exist_ok=True)
+    daily_path = out_dir / daily_name
+    update_path = out_dir / update_name
+    ledger_path = out_dir / ledger_name
+    if unlink_existing:
+        for path in (daily_path, update_path, ledger_path):
+            if path.exists():
+                path.unlink()
     soc = E_INITIAL_KWH
     cache: dict = {}
     detail = {}
     for i in range(end_index + 1):
         date = bundle.prices.dates[i].strftime("%Y-%m-%d")
         keep = write_all_dispatch or date in detail_dates
-        result = run_q4_3_day(bundle, i, soc, value_cut_cache=cache)
+        result = run_q4_3_day(
+            bundle, i, soc, value_cut_cache=cache, price_mode=price_mode
+        )
         soc = float(result.summary["soc_end_kwh"])
         _append_csv(daily_path, pd.DataFrame([result.summary]))
         _append_csv(update_path, result.update_log)
         if keep:
-            result.dispatch.to_csv(Q4_3_DISPATCH_DIR / f"dispatch_{date}.csv", index=False)
+            result.dispatch.to_csv(dest / f"dispatch_{date}.csv", index=False)
             ledger = result.dispatch[
                 ["date", "period_index", "normal_cost_yuan", "adjustment_cost_yuan", "emergency_cost_yuan"]
             ].copy()
@@ -166,16 +178,17 @@ def run_q4_3_campaign(
                         "g0_kwh": result.g0,
                         "g_final_kwh": result.g_final,
                     }
-                ).to_csv(out_dir / f"q4_3_commitment_versions_{date}.csv", index=False)
+                ).to_csv(out_dir / f"{commitment_prefix}_{date}.csv", index=False)
                 detail[date] = result
         print(
-            f"Q4-3 [{i+1}/{end_index+1}] {date} cost={result.summary['total_cost_yuan']:.2f} "
+            f"Q4-3/{price_mode} [{i+1}/{end_index+1}] {date} "
+            f"cost={result.summary['total_cost_yuan']:.2f} "
             f"soc={soc:.2f} adj={result.summary['adjustment_count']}",
             flush=True,
         )
         if date not in detail:
             del result
-    return {"detail": detail, "end_soc": soc, "pam_seed": PAM_SEED}
+    return {"detail": detail, "end_soc": soc, "pam_seed": PAM_SEED, "price_mode": price_mode}
 
 
 def load_q42_detail_from_disk(

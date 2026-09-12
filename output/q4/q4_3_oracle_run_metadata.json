@@ -1,0 +1,17 @@
+{
+  "system": "q4_3_price_oracle",
+  "executable": false,
+  "changes_main_scheme": false,
+  "n_days": 365,
+  "annual_cost_yuan": 17313064.403097387,
+  "end_soc": 1200.0,
+  "soc_continuity": {
+    "n_days": 365,
+    "max_soc_gap_kwh": 0.0,
+    "pass": true
+  },
+  "n_days_pass": 365,
+  "pam_seed": 0,
+  "elapsed_seconds": 1788.8220082250045,
+  "note": "Day-ahead and remaining prices equal today's actual path. Next-day value cuts remain causal. Not an official Q4-3 result."
+}

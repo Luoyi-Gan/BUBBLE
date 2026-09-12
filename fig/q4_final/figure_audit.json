@@ -1,0 +1,56 @@
+{
+  "status": "PASS",
+  "font": "WenQuanYi Micro Hei",
+  "png_dpi": 320,
+  "f2": {
+    "q2_k8_export_yuan": 14456670.549319457,
+    "q4_2_export_yuan": 15257873.753971763,
+    "q3_m1_m6_export_yuan": 14512748.52796609,
+    "q4_3_export_yuan": 15346418.13891758,
+    "q4_2_minus_q2_yuan": 801203.2046523057,
+    "q4_3_minus_q3_yuan": 833669.6109514907
+  },
+  "f3_q4_2": {
+    "selected_date": "2025-06-01",
+    "selection_metric": "maximum emergency_cost_yuan over 2025-02-01..2025-12-31",
+    "emergency_cost_yuan": 59327.81113103042,
+    "emergency_kwh": 14662.528464023591,
+    "dispatch_rows": 144,
+    "first_time": "00:10",
+    "last_time": "0:00+1",
+    "source": "output/q4/q4_2_dispatch_daily/dispatch_2025-06-01.csv"
+  },
+  "f3_q4_3": {
+    "selected_date": "2025-07-01",
+    "selection_metric": "maximum emergency_cost_yuan over 2025-02-01..2025-12-31",
+    "emergency_cost_yuan": 56139.15337350839,
+    "emergency_kwh": 13677.35992797974,
+    "dispatch_rows": 144,
+    "first_time": "00:10",
+    "last_time": "0:00+1",
+    "source": "output/q4/q4_3_dispatch_daily/dispatch_2025-07-01.csv"
+  },
+  "f4": {
+    "selected_blocks": 26,
+    "warmup_days": 28,
+    "calibrated_blocks": 25,
+    "alpha_060_days": 323,
+    "alpha_070_days": 14,
+    "calendar_start": "2025-01-01",
+    "calendar_end": "2025-12-31",
+    "alpha_070_window": "2025-03-12..2025-03-25"
+  },
+  "source_sha256": {
+    "output/q4/q4_2_warmup_daily.csv": "dda104eb937fe4e82f241f600b999f373816910e12a4706c5c1a7ce01279b76b",
+    "output/q4/q4_3_warmup_daily.csv": "c61f151d42e59f224054793a2d4f0ae660b2fbce449f94de0fe901cb7c13ffc6",
+    "output/q4/q4_2_alpha_selection.csv": "e8a186ec32b724f46c343e3d542c7628595eba08bbcd1b2dbd5c4753a1503aa6",
+    "output/q2_full_k8_risk/daily_summary.csv": "9a8fe409dfd4d37e4d9d0fd443811b92fadabcc90bde7c07ec0d2e9b130480d1",
+    "output/q3_full_annual/q3_annual_daily_summary.csv": "87eca2dfd33ab53558e119033d0d7b8ef22ab6730b8f89b19c163db5df756531",
+    "output/result4-2.xlsx": "e24f8b9af91c140b3f02905cd979aeb9c6d619eb8430fc33cc0104cee3e7654f",
+    "output/result4-3.xlsx": "9d5ea9b74f2a6c47308be9e8f2a148236fcb531e10373ab88e95fc5cbe7672b4",
+    "output/result3.xlsx": "635bc45f2ca3bf34090d803ffc4845562a96903d4f97a976ed78670888595aa6"
+  },
+  "oracle_on_main_figures": false,
+  "result4_2_unchanged": true,
+  "result4_3_unchanged": true
+}

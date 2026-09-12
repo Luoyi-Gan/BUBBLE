@@ -1,0 +1,49 @@
+{
+  "main_scheme": "Q4-3 M1_M6 causal prices, delivery-time phi+5pe",
+  "changes_main_scheme": false,
+  "q4_3_main": {
+    "annual_yuan": 17489808.237080485,
+    "export_yuan": 15346418.13891758,
+    "end_soc_kwh": 1200.0
+  },
+  "q4_2_main": {
+    "annual_yuan": 17681029.09881317,
+    "export_yuan": 15257873.753971763
+  },
+  "settlement_update_clock": {
+    "policy": "official_q4_3_dispatch_rebooked_only",
+    "changes_main_scheme": false,
+    "n_days": 365,
+    "n_export_days": 334,
+    "annual_delivery_yuan": 17489808.237080485,
+    "annual_update_clock_yuan": 17503867.588442847,
+    "annual_adjustment_delivery_yuan": 355672.4502120506,
+    "annual_adjustment_update_clock_yuan": 369731.8015744154,
+    "annual_adjustment_gap_yuan": 14059.351362364814,
+    "export_delivery_yuan": 15346418.13891758,
+    "export_update_clock_yuan": 15363785.340530388,
+    "all_ledger_match": true,
+    "note": "Main phi uses delivery-time p_t. The sensitivity keeps the same (g0, gF, e) and charges 0.5 |gF-g0| at the last update clock price p_{d,tau} (06:00/12:00/18:00 period ending at that clock)."
+  },
+  "pilot_dates": [
+    "2025-02-01",
+    "2025-06-21"
+  ],
+  "price_oracle": {
+    "annual_yuan": 17313064.403097387,
+    "export_yuan": 15186106.863616643,
+    "end_soc_kwh": 1200.0,
+    "gap_vs_main_annual_yuan": -176743.83398309723,
+    "note": "Offline reference only: midnight and remaining-horizon prices are today's actual path. Next-day value cuts stay causal. Not executable."
+  },
+  "two_day": {
+    "2025-02-01": {
+      "main_yuan": 18917.033334551164,
+      "oracle_yuan": 17933.123936862197
+    },
+    "2025-06-21": {
+      "main_yuan": 21776.976238659478,
+      "oracle_yuan": 22053.278842121785
+    }
+  }
+}

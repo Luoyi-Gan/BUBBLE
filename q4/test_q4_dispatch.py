@@ -72,6 +72,34 @@ class LedgerTests(unittest.TestCase):
         # Downward adjustment must not charge the cancelled energy twice as ordinary energy.
         self.assertAlmostEqual(float(phi[11]), 2.0 * 5.0 + 0.5 * 2.0 * cancelled)
 
+    def test_update_clock_settlement_rebooks_only_adjustment(self) -> None:
+        from q4.q4_3_sensitivity import adjustment_at_update_clock
+
+        n = 6
+        labels = ["00:10", "00:20", "00:30", "00:40", "00:50", "06:00"]
+        last = ["00:00", "00:00", "06:00", "06:00", "06:00", "06:00"]
+        g0 = np.array([10.0, 10.0, 10.0, 10.0, 10.0, 10.0])
+        gf = np.array([10.0, 10.0, 12.0, 7.0, 10.0, 10.0])
+        p = np.array([1.0, 1.0, 2.0, 2.0, 2.0, 4.0])
+        frame = pd.DataFrame(
+            {
+                "date": ["2025-02-01"] * n,
+                "time_label": labels,
+                "last_update_time": last,
+                "q_or_g0_kwh": g0,
+                "g_final_kwh": gf,
+                "emergency_kwh": np.zeros(n),
+                "actual_price": p,
+            }
+        )
+        alt = adjustment_at_update_clock(frame)
+        # Delivery: 0.5*2*|12-10| + 0.5*2*|7-10| = 2 + 3 = 5
+        self.assertAlmostEqual(float(alt["adjustment_delivery_yuan"].sum()), 5.0)
+        # Update clock uses p at 06:00 = 4: 0.5*4*2 + 0.5*4*3 = 4 + 6 = 10
+        self.assertAlmostEqual(float(alt["adjustment_update_clock_yuan"].sum()), 10.0)
+        self.assertAlmostEqual(float(alt["normal_cost_yuan"].sum()), float((p * gf).sum()))
+        self.assertAlmostEqual(float(alt.loc[0, "total_delivery_yuan"]), float(alt.loc[0, "total_update_clock_yuan"]))
+
 
 class HashAndBoundsTests(unittest.TestCase):
     def test_q_hash_detects_mutation(self) -> None:
@@ -215,6 +243,33 @@ class AttachmentSmokeTests(unittest.TestCase):
         six = self.q43.update_log[self.q43.update_log["update_time"] == "06:00"]
         if not six.empty:
             self.assertEqual(int(six.iloc[0]["first_mutable_index"]), 36)
+
+    def test_price_oracle_uses_actuals_and_does_not_replace_main(self) -> None:
+        from q4.q4_3 import run_q4_3_day
+
+        oracle = run_q4_3_day(self.bundle, 0, 6000.0, price_mode="oracle")
+        self.assertTrue(oracle.summary["pass"])
+        self.assertEqual(oracle.summary["price_mode"], "oracle")
+        self.assertEqual(oracle.update_log.iloc[0]["price_source"], "price_oracle")
+        np.testing.assert_allclose(
+            oracle.dispatch["price_forecast_used"].to_numpy(),
+            oracle.dispatch["actual_price"].to_numpy(),
+            atol=1e-12,
+        )
+        self.assertFalse(np.allclose(oracle.g0, self.q43.g0, atol=1e-6))
+        self.assertEqual(self.q43.summary.get("price_mode", "causal"), "causal")
+
+    def test_settlement_sensitivity_matches_official_feb1_ledger(self) -> None:
+        from pathlib import Path
+
+        from q4.q4_3_sensitivity import summarize_settlement_day
+
+        path = Path("output/q4/q4_3_dispatch_daily/dispatch_2025-02-01.csv")
+        if not path.exists():
+            self.skipTest("Q4-3 dispatch archive missing")
+        row = summarize_settlement_day(pd.read_csv(path))
+        self.assertTrue(row["ledger_matches_delivery"])
+        self.assertIn("adjustment_update_clock_yuan", row)
 
     def test_future_price_does_not_change_jan1_q(self) -> None:
         from q4.info_set import probe_day_ahead_invariance
