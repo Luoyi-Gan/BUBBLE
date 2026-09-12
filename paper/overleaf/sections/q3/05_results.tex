@@ -1,0 +1,37 @@
+主方案采用 A 边界（年末 SOC 为 $1200\,\mathrm{kWh}$）、因果负荷预测、线性锚点光伏映射、相对日初承诺的一次性调整结算，以及 \texttt{M1\_M6} 策略。以 2025 年 1 月 1 日 $6000\,\mathrm{kWh}$ 为起点并全年连续运行时，主方案实际成本为 $16\,373\,508.75$ 元；不利用后续预报调整的 M0 成本为 $17\,109\,568.25$ 元。因此，三次预测更新和价值触发调整使年度成本减少 $736\,059.50$ 元，降幅为 $4.30\%$。
+
+该比较说明后续预报的价值并非来自任意频繁修改计划，而是来自在可调整的剩余时段内，用新信息权衡调整费用、紧急购电风险与储能状态。\texttt{M1\_M6} 中的 M6 是对每个更新时点信息价值的可解释执行记录；在同一目标、约束和货币容差下，它不应被和 M1 解释成两项可相加的独立收益。
+
+年末 SOC 改为 $6000\,\mathrm{kWh}$ 的边界敏感性不改变策略排序，但使主策略成本增加 $2\,262.88$ 元，说明主结论不依赖于以过低年末 SOC 虚减成本。正式 \texttt{result3.xlsx} 按题设只含 2--12 月，共 $334$ 日，其区间成本为 $14\,512\,748.53$ 元；该值服务于输出核对，不能误称为全年成本。
+
+\input{tables/q3/strategy_comparison}
+
+表~\ref{tab:q3-strategy-compare} 汇总 A 边界下 M0 与 \texttt{M1\_M6} 的全年比较，并分列正式工作簿输出区间成本。题设格式结果以 2025 年 6 月 21 日为例展示如下。
+
+\input{tables/q3/purchase}
+\input{tables/q3/adjust}
+\input{tables/q3/storage}
+\input{tables/q3/emergency}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.88\linewidth]{figures/q3/fig_q3_strategy_cost.png}
+\caption{A 边界下各策略全年总成本分解（数据来源：\texttt{q3\_annual\_strategy\_comparison.csv}）。}
+\label{fig:q3-strategy-cost}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.94\linewidth]{figures/q3/fig_q3_monthly_emergency.png}
+\caption{2025 年 2--12 月 M0 与 \texttt{M1\_M6} 的紧急购电成本月度对比。}
+\label{fig:q3-monthly-emergency}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.94\linewidth]{figures/q3/fig_q3_update_value.png}
+\caption{\texttt{M1\_M6} 在 6:00、12:00、18:00 已实施调整的月度信息经济价值汇总。}
+\label{fig:q3-update-value}
+\end{figure}
+
+图~\ref{fig:q3-strategy-cost} 表明 \texttt{M1\_M6} 在 A 边界下总成本最低；图~\ref{fig:q3-monthly-emergency} 显示主方案在多数月份降低了紧急购电支出；图~\ref{fig:q3-update-value} 说明调整并非每日都发生，其价值在夏秋季更为集中。

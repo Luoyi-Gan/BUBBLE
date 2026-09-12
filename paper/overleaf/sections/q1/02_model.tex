@@ -1,0 +1,24 @@
+题给储能充放电效率为 $90\%$。本文按往返效率作对称等效拆分，令 $\eta_c=\eta_d=\sqrt{0.9}\approx0.9487$，从而 $\eta_c\eta_d=0.9$。往返效率为可用输出能量与输入能量之比\cite{nrel}；实际大型储能系统的效率会随功率和运行状态变化\cite{grimaldi}，故固定效率是与题目数据粒度相匹配的近似。
+
+以全天计划购电费用最小为目标：
+\begin{equation}\min\ C_1=\sum_{t=1}^{T}p_tg_t.\label{eq:q1-objective}\end{equation}
+逐时能量平衡和储电量递推分别为：
+\begin{align}
+g_t+P_t+d_t&=L_t+c_t+s_t,\label{eq:q1-balance}\\
+E_t&=E_{t-1}+\eta_c c_t-\frac{d_t}{\eta_d}.\label{eq:q1-state}
+\end{align}
+储能容量、循环边界、充放电功率及非负约束为：
+\begin{align}
+1200\le E_t\le10800,&\qquad E_0=E_T=6000,\label{eq:q1-capacity}\\
+0\le c_t\le5000\Delta t,&\qquad0\le d_t\le5000\Delta t,\label{eq:q1-power}\\
+g_t\ge0,&\qquad0\le s_t\le P_t.\label{eq:q1-nonnegative}
+\end{align}
+式\eqref{eq:q1-balance}保证公共母线侧供需平衡，式\eqref{eq:q1-state}把充电损耗和放电损耗计入储电量递推；式\eqref{eq:q1-capacity}将储电量控制在额定容量的 $10\%\sim90\%$，并令日末状态回到日初水平；式\eqref{eq:q1-power}由 $5000\,\mathrm{kW}\times1/6\,\mathrm{h}$ 得到单时段充放电量上限，即 $833.333\ldots\,\mathrm{kWh}$。若在低价时段 $i$ 充电并在高价时段 $j$ 放电，经济性条件为 $p_j\eta_c\eta_d>p_i$。
+
+以逐时能量平衡和储能状态递推描述社区微网的能量调度，是相关优化研究中的常见建模方式\cite{pinto}；本文只采用其模型结构，不移植文献中的设备或市场参数。图\ref{fig:q1-bus}说明各能量变量与公共母线计量边界的对应关系；本问外网购电量记为 $g_t$。
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.98\linewidth]{figures/q1/q1_figure_1.png}
+\caption{微网能量流与公共母线计量边界}\label{fig:q1-bus}
+\end{figure}
+\FloatBarrier

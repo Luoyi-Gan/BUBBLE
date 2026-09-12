@@ -1,6 +1,6 @@
 # 论文数字对账单（ACCT）
 
-> 生成时间：2026-09-12 16:48 UTC；脚本：`scripts/reconcile_paper_numbers.py`
+> 生成时间：2026-09-12 19:38 UTC；脚本：`scripts/reconcile_paper_numbers.py`
 
 ## 签收摘要
 
