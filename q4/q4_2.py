@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import dataclass, field
 from math import inf, sqrt
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 import pandas as pd
@@ -25,6 +26,7 @@ from q2.optimization import ValueCut, evaluate_value_cuts
 from q2.pilot import risk_quantile_floor
 from q4.bundle import Q4Bundle
 from q4.config import (
+    ALPHA_POLICY_LOOP,
     FIXED_SCENARIO_K,
     LOAD_INFORMATION_CASE,
     Q4_2_YEAR_END_RULE,
@@ -205,31 +207,160 @@ def build_q4_2_value_cuts(
     return cuts, rows
 
 
-def _validation_cost(
+@dataclass
+class AlphaSelection:
+    selected_alpha: float
+    window_records: list[dict]
+    daily_records: list[dict]
+
+
+def calibration_window(target_index: int, n_validation: int | None = None) -> np.ndarray:
+    n = RISK_CALIBRATION_DAYS if n_validation is None else int(n_validation)
+    if n <= 0 or target_index <= 0:
+        return np.zeros(0, dtype=int)
+    return np.arange(max(0, target_index - n), target_index, dtype=int)
+
+
+def q2_aligned_calibration_indices(n_days: int) -> list[int]:
+    """Q2 14-day blocks after the 28-day warmup: 28, 42, ..., up to the last complete index."""
+    return [
+        i
+        for i in range(RISK_WARMUP_DAYS, n_days)
+        if i % RISK_CALIBRATION_DAYS == 0
+    ]
+
+
+def _metrics_from_day(result: Q42DayResult, elapsed_seconds: float) -> dict:
+    q = np.asarray(result.q, dtype=float)
+    x = result.dispatch["x_kwh"].to_numpy(float)
+    soc_end = result.dispatch["soc_end_kwh"].to_numpy(float)
+    gap = (
+        float(result.value_rows[0]["certified_max_gap_yuan"])
+        if result.value_rows
+        else float("nan")
+    )
+    return {
+        "date": result.date,
+        "day_index": int(result.day_index),
+        "planned_fee_yuan": float(result.summary["normal_cost_yuan"]),
+        "emergency_fee_yuan": float(result.summary["emergency_cost_yuan"]),
+        "total_cost_yuan": float(result.summary["total_cost_yuan"]),
+        "unused_quota_kwh": float(np.sum(q - x)),
+        "emergency_kwh": float(result.summary["emergency_kwh"]),
+        "soc_start_kwh": float(result.summary["soc_start_kwh"]),
+        "soc_end_kwh": float(result.summary["soc_end_kwh"]),
+        "soc_min_kwh": float(soc_end.min()),
+        "soc_max_kwh": float(soc_end.max()),
+        "soc_end_path_kwh": ";".join(f"{value:.6f}" for value in soc_end),
+        "has_value_cuts": bool(result.value_rows),
+        "n_value_cuts": int(len(result.value_rows)),
+        "value_cut_gap_yuan": gap,
+        "value_cuts_used": bool(result.value_rows),
+        "no_future_info": True,
+        "used_full_day_actual_scheduler": False,
+        "k_effective": int(result.summary["k_effective"]),
+        "elapsed_seconds": float(elapsed_seconds),
+        "policy_loop": ALPHA_POLICY_LOOP,
+    }
+
+
+def run_candidate_window(
     bundle: Q4Bundle,
-    start_soc: float,
-    day_index: int,
-    k_target: int,
+    policy_start_soc: np.ndarray,
+    target_index: int,
+    *,
     risk_alpha: float | None,
-) -> tuple[float, float, float]:
-    loads, pvs, prices, probs, _sc, base_load, base_pv, _src, _ch = q4_2_day_inputs(
-        bundle, day_index, day_index, k_target
-    )
-    q_floor = risk_quantile_floor(loads, pvs, probs, base_load, base_pv, risk_alpha)
-    plan = solve_stochastic_plan_varying_price(
-        prices, loads, pvs, probs, start_soc, q_floor=q_floor
-    )
-    execution = solve_fixed_q_dispatch(
-        bundle.prices.price[day_index],
-        plan.q,
-        bundle.q2.load[day_index],
-        bundle.q2.pv[day_index],
-        start_soc,
-        throughput_tiebreak=False,
-    )
-    actual_p = bundle.prices.price[day_index]
-    cost = float(actual_p @ plan.q + EMERGENCY_PRICE_MULTIPLIER * actual_p @ execution.emergency)
-    return cost, float(execution.emergency.sum()), plan.solve_seconds + execution.solve_seconds
+    k_target: int = FIXED_SCENARIO_K,
+    n_validation: int | None = None,
+    log_prefix: str | None = None,
+) -> tuple[list[dict], dict]:
+    """Replay prior completed days with the official Q4-2 closed loop.
+
+    Each candidate carries its own SOC. The window opens at the deployed
+    policy's recorded start SOC on the first validation day. Full-day actual
+    path dispatch is not used.
+    """
+    validation = calibration_window(target_index, n_validation)
+    empty = {
+        "risk_alpha": None if risk_alpha is None else float(risk_alpha),
+        "k_target": int(k_target),
+        "validation_days": 0,
+        "mean_validation_cost_yuan": np.nan,
+        "standard_error_yuan": np.nan,
+        "total_planned_fee_yuan": np.nan,
+        "total_emergency_fee_yuan": np.nan,
+        "total_cost_yuan": np.nan,
+        "total_unused_quota_kwh": np.nan,
+        "emergency_purchase_kwh": np.nan,
+        "soc_window_start_kwh": np.nan,
+        "soc_window_end_kwh": np.nan,
+        "daily_soc_end_path_kwh": "",
+        "all_value_cuts_present": False,
+        "no_future_info": True,
+        "used_full_day_actual_scheduler": False,
+        "mean_elapsed_seconds": np.nan,
+        "mean_solve_seconds": np.nan,
+        "policy_loop": ALPHA_POLICY_LOOP,
+        "fallback_reason": "empty_validation_window",
+    }
+    if len(validation) == 0:
+        return [], empty
+    soc = float(policy_start_soc[int(validation[0])])
+    if not np.isfinite(soc):
+        empty["fallback_reason"] = "no_validation_soc"
+        return [], empty
+    daily: list[dict] = []
+    for offset, day_index in enumerate(validation):
+        started = perf_counter()
+        result = run_q4_2_day(
+            bundle, int(day_index), soc, risk_alpha, k_target=k_target
+        )
+        elapsed = perf_counter() - started
+        row = _metrics_from_day(result, elapsed)
+        row["risk_alpha"] = None if risk_alpha is None else float(risk_alpha)
+        row["k_target"] = int(k_target)
+        row["calibration_day_index"] = int(target_index)
+        daily.append(row)
+        soc = float(result.summary["soc_end_kwh"])
+        if log_prefix:
+            print(
+                f"{log_prefix} [{offset + 1}/{len(validation)}] {result.date} "
+                f"cost={row['total_cost_yuan']:.2f} soc={soc:.2f}",
+                flush=True,
+            )
+        del result
+    costs = np.asarray([row["total_cost_yuan"] for row in daily], dtype=float)
+    summary = {
+        "risk_alpha": None if risk_alpha is None else float(risk_alpha),
+        "k_target": int(k_target),
+        "validation_days": int(len(daily)),
+        "mean_validation_cost_yuan": float(np.mean(costs)),
+        "standard_error_yuan": float(
+            np.std(costs, ddof=1) / sqrt(len(costs)) if len(costs) > 1 else 0.0
+        ),
+        "total_planned_fee_yuan": float(sum(row["planned_fee_yuan"] for row in daily)),
+        "total_emergency_fee_yuan": float(
+            sum(row["emergency_fee_yuan"] for row in daily)
+        ),
+        "total_cost_yuan": float(np.sum(costs)),
+        "total_unused_quota_kwh": float(
+            sum(row["unused_quota_kwh"] for row in daily)
+        ),
+        "emergency_purchase_kwh": float(sum(row["emergency_kwh"] for row in daily)),
+        "soc_window_start_kwh": float(daily[0]["soc_start_kwh"]),
+        "soc_window_end_kwh": float(daily[-1]["soc_end_kwh"]),
+        "daily_soc_end_path_kwh": ";".join(
+            f"{row['soc_end_kwh']:.6f}" for row in daily
+        ),
+        "all_value_cuts_present": bool(all(row["has_value_cuts"] for row in daily)),
+        "no_future_info": True,
+        "used_full_day_actual_scheduler": False,
+        "mean_elapsed_seconds": float(np.mean([row["elapsed_seconds"] for row in daily])),
+        "mean_solve_seconds": float(np.mean([row["elapsed_seconds"] for row in daily])),
+        "policy_loop": ALPHA_POLICY_LOOP,
+        "fallback_reason": "",
+    }
+    return daily, summary
 
 
 def select_risk_alpha(
@@ -237,46 +368,30 @@ def select_risk_alpha(
     policy_start_soc: np.ndarray,
     target_index: int,
     k_target: int,
-) -> tuple[float, list[dict]]:
-    validation = np.arange(max(1, target_index - RISK_CALIBRATION_DAYS), target_index)
-    records = []
-    for alpha in RISK_ALPHA_CANDIDATES:
-        costs, emergency, times = [], [], []
-        for i in validation:
-            soc = float(policy_start_soc[int(i)])
-            if not np.isfinite(soc):
-                continue
-            cost, e, seconds = _validation_cost(
-                bundle, soc, int(i), k_target, float(alpha)
-            )
-            costs.append(cost)
-            emergency.append(e)
-            times.append(seconds)
-        if not costs:
-            records.append(
-                {
-                    "risk_alpha": float(alpha),
-                    "validation_days": 0,
-                    "mean_validation_cost_yuan": np.nan,
-                    "selected": False,
-                    "fallback_reason": "no_validation_soc",
-                }
-            )
-            continue
-        records.append(
-            {
-                "risk_alpha": float(alpha),
-                "validation_days": len(costs),
-                "mean_validation_cost_yuan": float(np.mean(costs)),
-                "standard_error_yuan": float(
-                    np.std(costs, ddof=1) / sqrt(len(costs)) if len(costs) > 1 else 0.0
-                ),
-                "emergency_purchase_kwh": float(np.sum(emergency)),
-                "mean_solve_seconds": float(np.mean(times)),
-                "selected": False,
-                "fallback_reason": "",
-            }
+    n_validation: int | None = None,
+    alphas: tuple[float, ...] | None = None,
+    log: bool = False,
+) -> AlphaSelection:
+    """Score each α on the prior completed days with the official Q4-2 loop."""
+    candidates = RISK_ALPHA_CANDIDATES if alphas is None else tuple(alphas)
+    records: list[dict] = []
+    daily_records: list[dict] = []
+    for alpha in candidates:
+        prefix = (
+            f"Q4-2 alpha-cal d={target_index} α={float(alpha):.2f}" if log else None
         )
+        daily, summary = run_candidate_window(
+            bundle,
+            policy_start_soc,
+            target_index,
+            risk_alpha=float(alpha),
+            k_target=k_target,
+            n_validation=n_validation,
+            log_prefix=prefix,
+        )
+        summary["selected"] = False
+        records.append(summary)
+        daily_records.extend(daily)
     eligible = [row for row in records if np.isfinite(row["mean_validation_cost_yuan"])]
     selected = min(
         eligible or records,
@@ -284,11 +399,16 @@ def select_risk_alpha(
             row["mean_validation_cost_yuan"]
             if np.isfinite(row["mean_validation_cost_yuan"])
             else inf,
-            row["risk_alpha"],
+            row["risk_alpha"] if row["risk_alpha"] is not None else inf,
         ),
     )
     selected["selected"] = True
-    return float(selected["risk_alpha"]), records
+    chosen = float(selected["risk_alpha"])
+    for row in daily_records:
+        row["selected"] = bool(
+            row["risk_alpha"] is not None and abs(float(row["risk_alpha"]) - chosen) < 1e-12
+        )
+    return AlphaSelection(chosen, records, daily_records)
 
 
 def run_q4_2_day(
@@ -299,6 +419,7 @@ def run_q4_2_day(
     k_target: int = FIXED_SCENARIO_K,
     write_dispatch: Path | None = None,
 ) -> Q42DayResult:
+    started = perf_counter()
     date = bundle.prices.dates[day_index].strftime("%Y-%m-%d")
     loads, pvs, prices, probs, scenarios, base_load, base_pv, price_src, chosen = q4_2_day_inputs(
         bundle, day_index, day_index, k_target
@@ -462,6 +583,15 @@ def run_q4_2_day(
         "curtailment_kwh": float(dispatch["curtailment_kwh"].sum()),
         "soc_start_kwh": float(initial_soc),
         "soc_end_kwh": float(soc),
+        "unused_quota_kwh": float(np.sum(locked_q - dispatch["x_kwh"].to_numpy(float))),
+        "has_value_cuts": bool(value_rows),
+        "n_value_cuts": int(len(value_rows)),
+        "value_cut_gap_yuan": (
+            float(value_rows[0]["certified_max_gap_yuan"]) if value_rows else float("nan")
+        ),
+        "no_future_info": True,
+        "used_full_day_actual_scheduler": False,
+        "elapsed_seconds": float(perf_counter() - started),
         "max_balance_residual_kwh": float(dispatch["balance_residual_kwh"].abs().max()),
         "max_simultaneous_cd_kwh2": max_cd,
         "max_x_minus_q_kwh": float(np.max(dispatch["x_kwh"].to_numpy() - locked_q)),
