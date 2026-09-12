@@ -19,7 +19,6 @@ from scripts.export_paper_q2_q3 import (  # noqa: E402
     SAMPLE_SLOTS,
     configure_style,
     fmt_num,
-    latex_code,
     load_charge_blocks,
     load_purchase_row,
     render_triplet_table,
@@ -36,23 +35,29 @@ TABLES = ROOT / "paper" / "manuscript" / "tables" / "q4"
 FIGURES = ROOT / "paper" / "overleaf" / "figures" / "q4"
 
 
-def load_cost_slices() -> tuple[pd.Series, pd.Series]:
+def load_cost_slices() -> tuple[pd.Series, pd.Series, float]:
     daily = pd.read_csv(WARMUP)
     daily["date"] = pd.to_datetime(daily["date"])
     jan = daily[daily["date"].dt.month == 1]
     feb_dec = daily[(daily["date"] >= "2025-02-01") & (daily["date"] <= "2025-12-31")]
-    return jan.sum(numeric_only=True), feb_dec.sum(numeric_only=True)
+    feb1_soc = float(feb_dec.iloc[0]["soc_start_kwh"])
+    return jan.sum(numeric_only=True), feb_dec.sum(numeric_only=True), feb1_soc
 
 
 def export_tables() -> dict:
     TABLES.mkdir(parents=True, exist_ok=True)
-    jan, feb = load_cost_slices()
+    jan, feb, feb1_soc = load_cost_slices()
     meta = json.loads(META.read_text(encoding="utf-8"))
     k_meta = json.loads(K_REVIEW.read_text(encoding="utf-8"))
     k_rows = []
     for k in k_meta["k_candidates"]:
         row = k_meta["by_k"][str(k)]
-        conclusion = latex_code("retain_k8_stable" if k == k_meta["decision"]["keep_k"] else "review_only")
+        if k == 4:
+            conclusion = "成本偏高"
+        elif k == k_meta["decision"]["keep_k"]:
+            conclusion = "主方案"
+        else:
+            conclusion = "成本最低、耗时较高"
         k_rows.append(
             f"$K={k}$ & {int(row['n_windows'])} & "
             f"{fmt_num(row['total_cost_yuan'], 2)} & "
@@ -110,7 +115,7 @@ def export_tables() -> dict:
 2--12 月正式输出 & 334 & {fmt_num(feb.normal_cost_yuan, 2)} & {fmt_num(feb.emergency_cost_yuan, 2)} & {fmt_num(feb.total_cost_yuan, 2)} \\\\
 \\midrule
 2--12 月紧急购电量/kWh & \\multicolumn{{4}}{{c}}{{{fmt_num(feb.emergency_kwh, 2)}}} \\\\
-2 月 1 日继承 SOC/kWh & \\multicolumn{{4}}{{c}}{{{fmt_num(feb.soc_start_kwh, 4)}}} \\\\
+2 月 1 日继承 SOC/kWh & \\multicolumn{{4}}{{c}}{{{fmt_num(feb1_soc, 4)}}} \\\\
 \\bottomrule
 \\end{{tabular}}
 \\end{{table}}
@@ -129,24 +134,26 @@ $K$ & 窗口数 & 验证总成本/元 & 验证紧急费/元 & 平均耗时/s & �
 \\end{{table}}
 """
 
-    annual = pd.read_csv(PRICE_MONTHLY)
-    annual = annual[annual["year_month"] != "2025-annual"]
+    price_all = pd.read_csv(PRICE_MONTHLY)
+    annual = price_all[price_all["year_month"] == "2025-annual"].iloc[0]
+    monthly = price_all[price_all["year_month"] != "2025-annual"]
     price_rows = []
-    for _, row in annual.iterrows():
+    for _, row in monthly.iterrows():
         price_rows.append(
             f"{row.year_month} & {fmt_num(row.day_ahead_mae, 4)} & "
-            f"{fmt_num(row.day_ahead_rmse, 4)} & {fmt_num(row.mpc_remaining_mae_mean, 4)} \\\\"
+            f"{fmt_num(row.day_ahead_rmse, 4)} & {fmt_num(row.intraday_06_mae, 4)} & "
+            f"{fmt_num(row.intraday_18_mae, 4)} & {fmt_num(row.mpc_remaining_mae_mean, 4)} \\\\"
         )
     price_tex = f"""\\begin{{table}}[htbp]
 \\centering
 \\caption{{Q4-2 价格预测误差（逐月；单位：元/kWh）}}\\label{{tab:q4-price-error}}
-\\normalsize\\setlength{{\\tabcolsep}}{{6pt}}
-\\begin{{tabular}}{{@{{}}lrrr@{{}}}}
+\\normalsize\\setlength{{\\tabcolsep}}{{5pt}}
+\\begin{{tabular}}{{@{{}}lrrrrr@{{}}}}
 \\toprule
-月份 & 日初 MAE & 日初 RMSE & 日内剩余 MAE均值 \\\\
+月份 & 日初 MAE & 日初 RMSE & 6:00 更新 MAE & 18:00 更新 MAE & 日内剩余 MAE \\\\
 \\midrule
 {chr(10).join(price_rows)}\\midrule
-全年 & {fmt_num(annual['day_ahead_mae'].mean(), 4)} & {fmt_num(annual['day_ahead_rmse'].mean(), 4)} & {fmt_num(annual['mpc_remaining_mae_mean'].mean(), 4)} \\\\
+全年 & {fmt_num(annual.day_ahead_mae, 4)} & {fmt_num(annual.day_ahead_rmse, 4)} & {fmt_num(annual.intraday_06_mae, 4)} & {fmt_num(annual.intraday_18_mae, 4)} & {fmt_num(annual.mpc_remaining_mae_mean, 4)} \\\\
 \\bottomrule
 \\end{{tabular}}
 \\end{{table}}
