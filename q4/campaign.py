@@ -149,3 +149,30 @@ def run_q4_3_campaign(
         )
         del result
     return {"detail": detail, "end_soc": soc, "pam_seed": PAM_SEED}
+
+
+def load_q42_detail_from_disk(
+    out_dir: Path = OUTPUT_DIR,
+    detail_dates: tuple[str, ...] = PILOT_DATES,
+) -> dict:
+    """Rebuild the in-memory Q4-2 pilot detail from streamed CSVs."""
+    from q4.q4_2 import Q42DayResult
+
+    daily = pd.read_csv(out_dir / "q4_2_warmup_daily.csv")
+    detail = {}
+    for date in detail_dates:
+        path = Q4_2_DISPATCH_DIR / f"dispatch_{date}.csv"
+        dispatch = pd.read_csv(path)
+        row = daily.loc[daily["date"] == date].iloc[0].to_dict()
+        alpha = row.get("risk_alpha")
+        if alpha is None or (isinstance(alpha, float) and not np.isfinite(alpha)):
+            row["risk_alpha"] = None
+        detail[date] = Q42DayResult(
+            date=date,
+            day_index=int(row["day_index"]),
+            q=dispatch["q_or_g0_kwh"].to_numpy(float),
+            dispatch=dispatch,
+            summary=row,
+            day_ahead_audit={},
+        )
+    return {"detail": detail, "end_soc": float(daily["soc_end_kwh"].iloc[-1]), "from_disk": True}

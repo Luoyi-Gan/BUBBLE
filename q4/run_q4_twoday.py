@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 import sys
@@ -26,7 +27,12 @@ from q4.audit import (  # noqa: E402
     write_json,
 )
 from q4.bundle import load_q4_bundle  # noqa: E402
-from q4.campaign import last_index_for_dates, run_q4_2_campaign, run_q4_3_campaign  # noqa: E402
+from q4.campaign import (  # noqa: E402
+    last_index_for_dates,
+    load_q42_detail_from_disk,
+    run_q4_2_campaign,
+    run_q4_3_campaign,
+)
 from q4.config import OUTPUT_DIR, PAM_SEED  # noqa: E402
 from q4.info_set import probe_executed_prefix  # noqa: E402
 
@@ -76,7 +82,7 @@ def _audit_detail(q42, q43):
         ok = (
             phys["pass"]
             and q_unchanged_probe(result.q, result.dispatch)
-            and abs(recon - result.summary["total_cost_yuan"]) < 1e-4
+            and abs(recon - float(result.summary["total_cost_yuan"])) < 1e-4
         )
         all_pass = all_pass and ok
         phys2["days"][date] = {**phys, "ledger_recompute_yuan": recon, "ok": ok}
@@ -87,7 +93,7 @@ def _audit_detail(q42, q43):
         ok = (
             phys["pass"]
             and prefix_lock_probe(result.update_log)
-            and abs(recon - result.summary["total_cost_yuan"]) < 1e-4
+            and abs(recon - float(result.summary["total_cost_yuan"])) < 1e-4
             and result.summary["locked_period_violations"] == 0
         )
         all_pass = all_pass and ok
@@ -97,17 +103,28 @@ def _audit_detail(q42, q43):
     return phys2, phys3, all_pass and phys2["all_pass"] and phys3["all_pass"]
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(description="Q4-2/Q4-3 two-day regression")
+    parser.add_argument("--skip-q4-2", action="store_true", help="reuse streamed Q4-2 CSVs")
+    parser.add_argument("--skip-tests", action="store_true", help="skip the unittest pre-check")
+    args = parser.parse_args(argv)
     started = perf_counter()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    tests = _run_unittest()
-    if tests["returncode"] != 0:
-        write_json(OUTPUT_DIR / "q4_twoday_run_metadata.json", {"tests": tests, "aborted": True})
-        raise SystemExit(f"unit tests failed:\n{tests['stderr_tail']}\n{tests['stdout_tail']}")
+    if args.skip_tests:
+        tests = {"command": "skipped", "returncode": 0, "stdout_tail": "", "stderr_tail": ""}
+    else:
+        tests = _run_unittest()
+        if tests["returncode"] != 0:
+            write_json(OUTPUT_DIR / "q4_twoday_run_metadata.json", {"tests": tests, "aborted": True})
+            raise SystemExit(f"unit tests failed:\n{tests['stderr_tail']}\n{tests['stdout_tail']}")
     bundle = load_q4_bundle(compute_price_mpc=False)
     end_index = last_index_for_dates(bundle, PILOT_DATES)
     print(f"Two-day regression with warmup through {bundle.prices.dates[end_index].strftime('%Y-%m-%d')}", flush=True)
-    q42 = run_q4_2_campaign(bundle, end_index, PILOT_DATES, OUTPUT_DIR)
+    if args.skip_q4_2:
+        q42 = load_q42_detail_from_disk(OUTPUT_DIR, PILOT_DATES)
+        print("Reusing Q4-2 dispatch CSVs from disk", flush=True)
+    else:
+        q42 = run_q4_2_campaign(bundle, end_index, PILOT_DATES, OUTPUT_DIR)
     q43 = run_q4_3_campaign(bundle, end_index, PILOT_DATES, OUTPUT_DIR)
     phys2, phys3, all_pass = _audit_detail(q42["detail"], q43["detail"])
     soc2 = warmup_soc_continuity(pd.read_csv(OUTPUT_DIR / "q4_2_warmup_daily.csv"))
@@ -156,6 +173,7 @@ def main() -> None:
         "q4_2_all_pass": phys2["all_pass"],
         "q4_3_all_pass": phys3["all_pass"],
         "all_pass": all_pass,
+        "skip_q4_2": bool(args.skip_q4_2),
         "note": (
             "Two-day regression only. January through each target date is causal "
             "SOC warmup. result4-2/result4-3 are not written in this stage."
@@ -165,6 +183,8 @@ def main() -> None:
     write_json(OUTPUT_DIR / "q4_3_run_metadata.json", {**meta, "system": "Q4-3"})
     write_json(OUTPUT_DIR / "q4_twoday_run_metadata.json", meta)
     print(json.dumps({"all_pass": all_pass, "elapsed_seconds": meta["elapsed_seconds"]}, indent=2))
+    if not all_pass:
+        raise SystemExit("two-day physical, ledger, or information-set audit failed")
 
 
 if __name__ == "__main__":

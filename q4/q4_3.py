@@ -37,6 +37,18 @@ from q3.optimization import (
     settlement_cost,
     solve_horizon,
 )
+
+
+def _solve_horizon(*args, **kwargs):
+    """Call Q3's LP; if the unique-throughput tiebreak is numerically infeasible, keep the primary solution."""
+    try:
+        return solve_horizon(*args, **kwargs)
+    except RuntimeError as exc:
+        if "tiebreak" not in str(exc):
+            raise
+        kwargs = dict(kwargs)
+        kwargs["throughput_tiebreak"] = False
+        return solve_horizon(*args, **kwargs)
 from q4.bundle import Q4Bundle
 from q4.config import (
     LOAD_INFORMATION_CASE,
@@ -86,7 +98,7 @@ def build_q4_3_value_cuts(
     solved: dict[float, ValueCut] = {}
 
     def solve_at(soc: float) -> None:
-        result = solve_horizon(
+        result = _solve_horizon(
             price,
             load,
             pv,
@@ -182,7 +194,7 @@ def plan_g0(
         cuts, _rows = build_q4_3_value_cuts(
             bundle, day_index, 0, next_terminal, value_cut_cache
         )
-    midnight = solve_horizon(
+    midnight = _solve_horizon(
         price0,
         plan_load,
         mapped0.today_kwh.copy(),
@@ -230,7 +242,7 @@ def run_q4_3_day(
     cuts, value_rows = build_q4_3_value_cuts(
         bundle, day_index, 0, next_terminal, value_cut_cache
     )
-    midnight = solve_horizon(
+    midnight = _solve_horizon(
         price0,
         plan_load,
         current_forecast,
@@ -292,7 +304,7 @@ def run_q4_3_day(
             load_plan = plan_load[t:]
             g_pre = g[t:].copy()
             settle_kw = remaining_kwargs(t, price_now[t:])
-            j_fix = solve_horizon(
+            j_fix = _solve_horizon(
                 price_now[t:],
                 load_plan,
                 pv_plan,
@@ -300,7 +312,7 @@ def run_q4_3_day(
                 g_fixed=g_pre,
                 **settle_kw,
             )
-            j_free = solve_horizon(
+            j_free = _solve_horizon(
                 price_now[t:],
                 load_plan,
                 pv_plan,
@@ -341,7 +353,7 @@ def run_q4_3_day(
         pv_horizon = current_forecast[t:].copy()
         pv_horizon[0] = actual_pv[t]
         load_horizon = execution_load_horizon(plan_load, actual_load, t)
-        step = solve_horizon(
+        step = _solve_horizon(
             price_now[t:],
             load_horizon,
             pv_horizon,
