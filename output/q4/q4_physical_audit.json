@@ -1,0 +1,50 @@
+{
+  "q4_2": {
+    "system": "q4_2",
+    "n_dispatch_files": 365,
+    "n_days": 365,
+    "n_physical_pass": 365,
+    "soc_continuity": {
+      "n_days": 365,
+      "max_soc_gap_kwh": 0.0,
+      "pass": true
+    },
+    "max_balance_residual_kwh": 3.36142420565011e-08,
+    "max_x_minus_cap_kwh": 0.0,
+    "max_simultaneous_cd_kwh2": 0.0,
+    "max_charge_or_discharge_kwh": 833.3333333333335,
+    "power_limit_kwh": 833.3333333333333,
+    "max_intraday_soc_chain_gap_kwh": 0.0,
+    "soc_min_kwh": 1200.0,
+    "soc_max_kwh": 10800.0,
+    "max_ledger_vs_daily_gap_yuan": 2.9103830456733704e-11,
+    "info_cutoff_failures": 0,
+    "prefix_lock_failures": 0,
+    "dec31_soc_kwh": 1200.0,
+    "pass": true
+  },
+  "q4_3": {
+    "system": "q4_3",
+    "n_dispatch_files": 365,
+    "n_days": 365,
+    "n_physical_pass": 365,
+    "soc_continuity": {
+      "n_days": 365,
+      "max_soc_gap_kwh": 0.0,
+      "pass": true
+    },
+    "max_balance_residual_kwh": 9.492509889241775e-08,
+    "max_x_minus_cap_kwh": 0.0,
+    "max_simultaneous_cd_kwh2": 0.0,
+    "max_charge_or_discharge_kwh": 833.3333334265471,
+    "power_limit_kwh": 833.3333333333333,
+    "max_intraday_soc_chain_gap_kwh": 0.0,
+    "soc_min_kwh": 1199.9999999999982,
+    "soc_max_kwh": 10800.000000000004,
+    "max_ledger_vs_daily_gap_yuan": 2.9103830456733704e-11,
+    "info_cutoff_failures": 0,
+    "prefix_lock_failures": 0,
+    "dec31_soc_kwh": 1200.0,
+    "pass": true
+  }
+}
