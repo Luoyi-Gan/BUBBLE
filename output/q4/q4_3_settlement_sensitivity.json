@@ -1,0 +1,15 @@
+{
+  "policy": "official_q4_3_dispatch_rebooked_only",
+  "changes_main_scheme": false,
+  "n_days": 365,
+  "n_export_days": 334,
+  "annual_delivery_yuan": 17489808.237080485,
+  "annual_update_clock_yuan": 17503867.588442847,
+  "annual_adjustment_delivery_yuan": 355672.4502120506,
+  "annual_adjustment_update_clock_yuan": 369731.8015744154,
+  "annual_adjustment_gap_yuan": 14059.351362364814,
+  "export_delivery_yuan": 15346418.13891758,
+  "export_update_clock_yuan": 15363785.340530388,
+  "all_ledger_match": true,
+  "note": "Main phi uses delivery-time p_t. The sensitivity keeps the same (g0, gF, e) and charges 0.5 |gF-g0| at the last update clock price p_{d,tau} (06:00/12:00/18:00 period ending at that clock)."
+}
