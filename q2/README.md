@@ -55,3 +55,24 @@ python q2/run_q2_k8_risk.py
 `run_q2_k8_risk.py` 保留旧方案不覆盖，输出固定 K=8 与滚动风险分位候选方案到
 `output/q2_full_k8_risk/`。K=8 的验证依据、早期 K=1 回退和成本复核见
 `docs/reviews/q2-k8-risk-recalculation.md`。
+
+## 政策一致重设计（C2-R1）
+
+独立入口，不改写旧生产语义，也不覆盖 `output/q2_full_k8_risk/` 或 `result2.xlsx`。
+
+```bash
+python -m unittest q2.test_q2 -v
+python q2/run_q2_policy_consistent.py
+python q2/validate_q2_policy_consistent.py
+```
+
+C2-R1 只跑 2025-02-01 与 2025-06-21 两日闭环试运行，输出到
+`output/q2_policy_consistent/`。
+
+```bash
+python q2/run_q2_policy_consistent_r2.py
+python q2/validate_q2_policy_consistent.py
+```
+
+C2-R2 对每个 14 日块评估 12 组 `(m,α)` 闭环政策，以实际成本 $\sum(pq+5pe)$ 选择主策略；
+MAE 只作诊断。全年正式台账与敏感性仍留到 C2-R3。

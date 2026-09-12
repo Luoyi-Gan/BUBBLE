@@ -1,0 +1,17 @@
+{
+  "q2": {
+    "sample_date": "2025-06-21",
+    "feb_dec_total_yuan": 15166538.460929552,
+    "emergency_segments": 1
+  },
+  "q3": {
+    "annual_m1m6_yuan": 16373508.74903882,
+    "annual_saving_yuan": 736059.5026960894,
+    "export_window_yuan": 14512748.527966088
+  },
+  "q4_2": {
+    "annual_cost_yuan": 17681029.09881317,
+    "export_window_yuan": 15257873.753971763,
+    "feb_dec_emergency_kwh": 541155.3930922948
+  }
+}

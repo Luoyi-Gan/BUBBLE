@@ -1,0 +1,37 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{paper_layout}[2026/09/12 unified paper layout]
+\RequirePackage{placeins}
+\geometry{a4paper,left=25mm,right=25mm,top=25mm,bottom=25mm}
+% Fandol Song / Hei are available in Overleaf; the same fonts are used locally.
+\setCJKmainfont{FandolSong-Regular.otf}[BoldFont=FandolSong-Bold.otf,ItalicFont=FandolKai-Regular.otf]
+\setCJKsansfont{FandolHei-Regular.otf}[BoldFont=FandolHei-Bold.otf]
+\setCJKfamilyfont{zhsong}{FandolSong-Regular.otf}[BoldFont=FandolSong-Bold.otf]
+\setCJKfamilyfont{zhhei}{FandolHei-Regular.otf}[BoldFont=FandolHei-Bold.otf]
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0pt}
+\setstretch{1.35}
+\renewcommand{\thesection}{\chinese{section}、}
+\renewcommand{\thesubsection}{\arabic{section}.\arabic{subsection}}
+\renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
+\titleformat{\section}{\centering\heiti\fontsize{16}{20}\selectfont}{\thesection}{0pt}{}
+\titleformat{\subsection}{\heiti\fontsize{14}{18}\selectfont}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\heiti\fontsize{12}{16}\selectfont}{\thesubsubsection}{0.6em}{}
+\titleformat{\paragraph}[runin]{\heiti\normalsize}{}{0pt}{}
+\titlespacing*{\paragraph}{2em}{0.6em}{0.5em}
+\hypersetup{hidelinks,colorlinks=false,pdfauthor={}}
+\AtBeginDocument{\color{black}\normalsize\setstretch{1.35}\setlength{\parindent}{2em}}
+\captionsetup{font={small,color=black},labelfont={color=black},labelsep=quad}
+\lstset{backgroundcolor={},basicstyle=\ttfamily\small\color{black},numberstyle=\tiny\color{black},rulecolor=\color{black},keywordstyle=\color{black}\bfseries,commentstyle=\color{black},stringstyle=\color{black}}
+\setlength{\emergencystretch}{2em}
+% Reference-image table style: thin black rules, centered regular-weight cells.
+\setlength{\heavyrulewidth}{0.6pt}
+\setlength{\lightrulewidth}{0.4pt}
+\setlength{\tabcolsep}{7pt}
+\raggedbottom
+% Draft notes have no background or color; they never appear as experimental results.
+\newcommand{\pendingnote}[1]{\ifDraftNotes\par\noindent\textbf{【待撰写】}#1\par\fi}
+\newcommand{\reviewtitle}[1]{\begin{center}{\heiti\fontsize{18}{23}\selectfont #1}\end{center}\vspace{0.5em}}
+\newcommand{\algostep}[2]{\par\noindent\textbf{Step #1：#2}\par\nopagebreak}
+\newcommand{\algorithmstart}{\par\medskip\noindent\rule{\linewidth}{0.8pt}\par\noindent\textbf{算法步骤}\par\noindent\rule{\linewidth}{0.4pt}\par}
+\newcommand{\algorithmend}{\par\noindent\rule{\linewidth}{0.8pt}\par\medskip}
+\endinput

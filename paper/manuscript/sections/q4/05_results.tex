@@ -1,0 +1,36 @@
+\subsection{问题四（Q4-2）：波动电价下的日前额度—因果 MPC}
+
+Q4-2 在 Q2 政策一致框架上引入附件 4 的\textbf{交付时段实际价格}，结算按 $p_{d,t}q_{d,t}+5p_{d,t}e_{d,t}$ 计入。风险分位 $\alpha$ 的校准采用与部署相同的闭环协议：每个候选均在“联合情景日前计划—锁定 $q$—逐十分钟因果 MPC—连续传递 SOC”链条上评分；$\alpha\in\{0.60,0.70,0.80,0.90\}$ 共 25 个校准窗口，最终滚动选中 $\{0.60,0.70\}$。情景数仍取 $K=8$，并在相同协议下复核 $K=4,8,12$，结论为 \texttt{retain\_k8\_stable}。
+
+1 月仍只作预测历史与 SOC 预热。题设 \texttt{result4-2.xlsx} 的输出区间为 2025 年 2 月 1 日至 12 月 31 日，共 $334$ 日；该区间实际结算成本为 $15\,257\,873.75$ 元，其中按锁定额度计费的计划部分为 $13\,213\,373.44$ 元，紧急购电部分为 $2\,044\,500.32$ 元。若报告 1--12 月完整核算，全年成本为 $17\,681\,029.10$ 元，其中 1 月预热成本为 $2\,423\,155.34$ 元；2 月 1 日继承 SOC 为 $5541.1011\,\mathrm{kWh}$。
+
+与固定价 Q2 主方案（V2，2--12 月 $15\,166\,538.46$ 元）相比，同一输出区间因交付价权重变化增加 $91\,335.29$ 元（约 $0.60\%$）。该差异来自波动价下“提前锁定额度”的沉没计划成本与紧急购电风险的再权衡，而非改变 Q2 的因果预测与 MPC 结构。
+
+\input{tables/q4/cost_summary}
+
+表~\ref{tab:q4-cost-summary} 分列预热期与正式输出；表~\ref{tab:q4-parameter} 给出 $K$ 复核；表~\ref{tab:q4-price-error} 汇总逐月价格预测误差。题设格式结果以 2025 年 6 月 21 日为例展示如下。
+
+\input{tables/q4/parameter_selection}
+\input{tables/q4/price_forecast_error}
+\input{tables/q4/purchase}
+\input{tables/q4/storage}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.94\linewidth]{figures/q4/fig_q4_monthly_cost.png}
+\caption{Q4-2：2025 年 2--12 月月度购电成本构成（数据来源：\texttt{q4\_2\_warmup\_daily.csv}）。}
+\label{fig:q4-monthly-cost}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.92\linewidth]{figures/q4/fig_q4_price_error.png}
+\caption{Q4-2：逐月价格预测误差（数据来源：\texttt{q4\_price\_forecast\_monthly.csv}）。}
+\label{fig:q4-price-error}
+\end{figure}
+
+图~\ref{fig:q4-monthly-cost} 显示夏秋季紧急购电占比上升，与 Q2 类似的高负荷时段一致；图~\ref{fig:q4-price-error} 表明日初与日内剩余预测误差均在 $0.04\sim0.06\,\mathrm{元/kWh}$ 量级，未出现系统性低估高价时段。
+
+\subsection{问题四（Q4-3）}
+
+Q4-3 在固定 \texttt{M1\_M6} 下将调整费与紧急购电改为按交付时段实际价格结算。其全年结果与检验待 Q4-3 链路与正文图表一并签收后写入；本节暂不报告 Q4-3 成本数值，以免与 Q3 固定价主结论混比。

@@ -69,7 +69,7 @@ def _terminal_value_expression(
 ) -> tuple[cp.Variable | None, list[cp.Constraint]]:
     if not cuts:
         return None, []
-    value = cp.Variable(nonneg=True)
+    value = cp.Variable(nonneg=True, name="terminal_value")
     constraints = [
         value >= cut_value + slope * (terminal_soc - reference_soc)
         for reference_soc, cut_value, slope in cuts
@@ -214,6 +214,81 @@ def solve_stochastic_plan(
         initial_soc_marginal=marginal,
         solve_seconds=elapsed,
         status=str(problem.status),
+    )
+
+
+@dataclass(frozen=True)
+class BaselinePlanResult(PlanResult):
+    variable_shapes: dict[str, tuple[int, ...]]
+    has_scenario_specific_battery: bool
+
+
+def solve_baseline_plan(
+    price: np.ndarray,
+    load_hat: np.ndarray,
+    pv_hat: np.ndarray,
+    initial_soc: float,
+    q_floor: np.ndarray | None = None,
+    terminal_value_cuts: tuple[ValueCut, ...] | None = None,
+) -> BaselinePlanResult:
+    """Day-ahead LP on a single forecast path; q is locked and billed at p@q."""
+    n = len(load_hat)
+    if load_hat.shape != (n,) or pv_hat.shape != (n,) or price.shape != (n,):
+        raise ValueError("baseline plan requires a single forecast trajectory")
+    q = cp.Variable(n, nonneg=True, name="q")
+    x = cp.Variable(n, nonneg=True, name="x")
+    emergency = cp.Variable(n, nonneg=True, name="emergency")
+    charge = cp.Variable(n, nonneg=True, name="charge")
+    discharge = cp.Variable(n, nonneg=True, name="discharge")
+    curtailment = cp.Variable(n, nonneg=True, name="curtailment")
+    soc = cp.Variable(n + 1, name="soc")
+    constraints = _contract_constraints(x, q)
+    if q_floor is not None:
+        floor = np.asarray(q_floor, dtype=float).ravel()
+        if floor.shape != (n,) or np.any(floor < -1e-9):
+            raise ValueError("q_floor must be a nonnegative vector matching the horizon")
+        constraints.append(q >= floor)
+    physical = _physical_constraints(
+        load_hat, pv_hat, initial_soc, x, emergency, charge, discharge, curtailment, soc
+    )
+    constraints += physical
+    terminal_value, terminal_constraints = _terminal_value_expression(
+        soc[-1], terminal_value_cuts
+    )
+    constraints += terminal_constraints
+    planned_cost = _planned_normal_cost(price, q)
+    expected_emergency = EMERGENCY_PRICE_MULTIPLIER * price @ emergency
+    objective = planned_cost + expected_emergency
+    if terminal_value is not None:
+        objective = objective + terminal_value
+    problem = cp.Problem(cp.Minimize(objective), constraints)
+    started = perf_counter()
+    problem.solve(solver=SOLVER, verbose=False)
+    elapsed = perf_counter() - started
+    if q.value is None:
+        raise RuntimeError(f"baseline plan LP failed: {problem.status}")
+    qv = np.asarray(q.value).ravel()
+    shapes = {
+        str(variable.name()): tuple(int(dim) for dim in variable.shape)
+        for variable in problem.variables()
+    }
+    has_scenario_battery = any(
+        name in {"charge", "discharge", "soc"} and len(shape) == 2
+        for name, shape in shapes.items()
+    )
+    terminal_value_result = (
+        float(terminal_value.value) if terminal_value is not None else 0.0
+    )
+    return BaselinePlanResult(
+        q=qv,
+        planned_cost=float(price @ qv),
+        expected_emergency_cost=float(EMERGENCY_PRICE_MULTIPLIER * price @ emergency.value),
+        expected_terminal_value=terminal_value_result,
+        initial_soc_marginal=-float(np.asarray(physical[0].dual_value)),
+        solve_seconds=elapsed,
+        status=str(problem.status),
+        variable_shapes=shapes,
+        has_scenario_specific_battery=has_scenario_battery,
     )
 
 
