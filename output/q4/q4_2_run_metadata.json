@@ -1,33 +1,23 @@
 {
-  "git_commit": "0846ebb768f0fa20d9d962573e0e7ab0e428d7ff",
-  "pilot_dates": [
-    "2025-02-01",
-    "2025-06-21"
-  ],
-  "warmup_start": "2025-01-01",
-  "warmup_end": "2025-06-21",
-  "n_days_solved_each_system": 172,
-  "pam_seed": 0,
-  "pam_algorithm": "deterministic_build_then_swap",
-  "load_information_case": "causal_load_main",
-  "q4_2_year_end_rule": "q2_accepted_no_hard_terminal",
-  "q4_3_year_end": "A_q2_aligned_1200",
-  "q4_3_strategy": "M1_M6",
-  "settlement_rule": "delivery_time_actual_price",
-  "wrote_result4_xlsx": false,
-  "full_year": false,
-  "elapsed_seconds": 51.936632716999156,
-  "tests": {
-    "command": "python -m unittest q2.test_q2 q3.test_q3 q3.test_q3_result3_export q4.test_q4_price_forecast q4.test_q4_dispatch -v",
-    "returncode": 0,
-    "stdout_tail": "",
-    "stderr_tail": "test_step_first_hour_is_forecast_hour_one (q3.test_q3.MappingSensitivityTests.test_step_first_hour_is_forecast_hour_one) ... ok\ntest_no_double_charge_on_cancelled_energy (q3.test_q3.SettlementTests.test_no_double_charge_on_cancelled_energy) ... ok\ntest_three_settlement_cases (q3.test_q3.SettlementTests.test_three_settlement_cases) ... ok\ntest_dec31_m0_run_day_hits_1200 (q3.test_q3.YearEndSocAttachmentTests.test_dec31_m0_run_day_hits_1200) ... ok\ntest_dec31_virtual_next_day_from_dec30_hits_target (q3.test_q3.YearEndSocAttachmentTests.test_dec31_virtual_next_day_from_dec30_hits_target) ... ok\ntest_december_indices_match_year_end_rules (q3.test_q3.YearEndSocAttachmentTests.test_december_indices_match_year_end_rules) ... ok\ntest_make_run_id_appends_year_end_tag (q3.test_q3.YearEndSocHelperTests.test_make_run_id_appends_year_end_tag) ... ok\ntest_make_run_id_without_year_end_unchanged (q3.test_q3.YearEndSocHelperTests.test_make_run_id_without_year_end_unchanged) ... ok\ntest_solve_horizon_hits_hard_terminal_soc (q3.test_q3.YearEndSocHelperTests.test_solve_horizon_hits_hard_terminal_soc) ... ok\ntest_value_cut_cache_key_splits_dec30_boundaries (q3.test_q3.YearEndSocHelperTests.test_value_cut_cache_key_splits_dec30_boundaries) ... ok\ntest_year_end_constraint_days (q3.test_q3.YearEndSocHelperTests.test_year_end_constraint_days) ... ok\ntest_soc_start_and_required_columns (q3.test_q3_result3_export.EnrichDispatchTests.test_soc_start_and_required_columns) ... ok\ntest_update_prefix_is_locked (q3.test_q3_result3_export.LockedLabelTests.test_update_prefix_is_locked) ... ok\ntest_template_fill_is_unrotated_and_excludes_january (q3.test_q3_result3_export.Result3WorkbookTests.test_template_fill_is_unrotated_and_excludes_january) ... ok\ntest_solver_tolerance_match (q3.test_q3_result3_export.SummaryCompareTests.test_solver_tolerance_match) ... ok\ntest_two_pilot_days_are_causal (q4.test_q4_price_forecast.AttachmentRegressionTests.test_two_pilot_days_are_causal) ... ok\ntest_prev_day_and_weekday_windows (q4.test_q4_price_forecast.CandidateConstructionTests.test_prev_day_and_weekday_windows) ... ok\ntest_six_am_uses_only_ended_prefix (q4.test_q4_price_forecast.LeakageTests.test_six_am_uses_only_ended_prefix) ... ok\ntest_clamp_at_zero (q4.test_q4_price_forecast.OLSTests.test_clamp_at_zero) ... ok\ntest_fallback_when_too_few_or_zero_variance (q4.test_q4_price_forecast.OLSTests.test_fallback_when_too_few_or_zero_variance) ... ok\ntest_recovers_linear_residual (q4.test_q4_price_forecast.OLSTests.test_recovers_linear_residual) ... ok\ntest_selection_ignores_current_and_future_prices (q4.test_q4_price_forecast.OnlineSelectionTests.test_selection_ignores_current_and_future_prices) ... ok\ntest_tie_break_prefers_shorter_history (q4.test_q4_price_forecast.OnlineSelectionTests.test_tie_break_prefers_shorter_history) ... ok\ntest_weekday_fallback_to_previous_day (q4.test_q4_price_forecast.OnlineSelectionTests.test_weekday_fallback_to_previous_day) ... ok\ntest_day_ahead_as_of_ignores_current_day_price (q4.test_q4_dispatch.AttachmentSmokeTests.test_day_ahead_as_of_ignores_current_day_price) ... ok\ntest_future_price_does_not_change_day14_decisions (q4.test_q4_dispatch.AttachmentSmokeTests.test_future_price_does_not_change_day14_decisions) ... ok\ntest_future_price_does_not_change_jan1_q (q4.test_q4_dispatch.AttachmentSmokeTests.test_future_price_does_not_change_jan1_q) ... ok\ntest_jan1_q43_prefix_and_ledger (q4.test_q4_dispatch.AttachmentSmokeTests.test_jan1_q43_prefix_and_ledger) ... ok\ntest_jan1_q_locked_and_physical (q4.test_q4_dispatch.AttachmentSmokeTests.test_jan1_q_locked_and_physical) ... ok\ntest_emergency_and_soc_bounds (q4.test_q4_dispatch.HashAndBoundsTests.test_emergency_and_soc_bounds) ... ok\ntest_q_hash_detects_mutation (q4.test_q4_dispatch.HashAndBoundsTests.test_q_hash_detects_mutation) ... ok\ntest_q42_ledger_uses_p_times_q_not_x (q4.test_q4_dispatch.LedgerTests.test_q42_ledger_uses_p_times_q_not_x) ... ok\ntest_q43_ledger_matches_phi_plus_emergency (q4.test_q4_dispatch.LedgerTests.test_q43_ledger_matches_phi_plus_emergency) ... ok\ntest_price_module_still_ignores_future (q4.test_q4_dispatch.PriceLeakageReuseTests.test_price_module_still_ignores_future) ... ok\ntest_distance_is_symmetric_and_paired (q4.test_q4_dispatch.TripleResidualTests.test_distance_is_symmetric_and_paired) ... ok\n\n----------------------------------------------------------------------\nRan 60 tests in 26.628s\n\nOK"
+  "git_commit": "652cf8750e624a2ced2eed477f43da708ba3ccdd",
+  "system": "q4_2",
+  "full_year": true,
+  "n_days": 365,
+  "annual_cost_yuan": 17680437.930237956,
+  "soc_continuity": {
+    "n_days": 365,
+    "max_soc_gap_kwh": 0.0,
+    "pass": true
   },
-  "q4_2_all_pass": true,
-  "q4_3_all_pass": true,
-  "all_pass": true,
-  "skip_q4_2": true,
-  "skip_q4_3": true,
-  "note": "Two-day regression only. January through each target date is causal SOC warmup. result4-2/result4-3 are not written in this stage.",
-  "system": "Q4-2"
+  "n_days_pass": 365,
+  "end_soc": 1200.0,
+  "pam_seed": 0,
+  "load_information_case": "causal_load_main",
+  "settlement_rule": "delivery_time_actual_price",
+  "elapsed_seconds": 2225.878171479002,
+  "wrote_result4_xlsx": true,
+  "two_day_costs": {
+    "2025-02-01": 19757.45854298777,
+    "2025-06-21": 22322.36098095029
+  }
 }
