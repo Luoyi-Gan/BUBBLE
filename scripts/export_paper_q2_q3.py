@@ -5,7 +5,7 @@ Reads only accepted outputs:
 - Q2: output/q2_policy_consistent/result2.xlsx and annual CSV ledgers
 - Q3: output/result3.xlsx and output/q3_full_annual/*.csv
 
-Writes LaTeX tables and PNG/PDF figures under paper/overleaf/.
+Writes LaTeX tables under paper/manuscript/ and PNG/PDF figures under paper/overleaf/.
 """
 
 from __future__ import annotations
@@ -27,8 +27,9 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 PAPER = ROOT / "paper" / "overleaf"
-TABLES_Q2 = PAPER / "tables" / "q2"
-TABLES_Q3 = PAPER / "tables" / "q3"
+MANUSCRIPT = ROOT / "paper" / "manuscript"
+TABLES_Q2 = MANUSCRIPT / "tables" / "q2"
+TABLES_Q3 = MANUSCRIPT / "tables" / "q3"
 FIG_Q2 = PAPER / "figures" / "q2"
 FIG_Q3 = PAPER / "figures" / "q3"
 
