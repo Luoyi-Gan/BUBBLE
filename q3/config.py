@@ -32,8 +32,12 @@ ATTACH_DIR = resolve_attach_dir()
 ATTACH1 = ATTACH_DIR / "附件1.xlsx"
 ATTACH2 = ATTACH_DIR / "附件2.xlsx"
 ATTACH3 = ATTACH_DIR / "附件3.xlsx"
+ATTACH4 = ATTACH_DIR / "附件4.xlsx"
+RESULT3_TEMPLATE = ATTACH_DIR / "附件5" / "result3.xlsx"
 OUTPUT_DIR = ROOT / "output" / "q3_pilot"
 FIG_DIR = ROOT / "fig" / "q3_pilot"
+RESULT3_XLSX = ROOT / "output" / "result3.xlsx"
+RESULT3_EXPORT_AUDIT = ROOT / "output" / "result3_export_audit.json"
 
 T = 144
 DELTA_H = 1.0 / 6.0
@@ -62,6 +66,143 @@ NUMERIC_TOL = 1e-6
 SIMULTANEOUS_CD_TOL = 1e-4
 SOLVER = "HIGHS"
 PILOT_DATES = ("2025-02-01", "2025-06-21")
+
+PV_MAPPING_LINEAR = "linear_anchor_main"
+PV_MAPPING_STEP = "step_hourly_sensitivity"
+PV_MAPPING_MODES = (PV_MAPPING_LINEAR, PV_MAPPING_STEP)
+
+SETTLEMENT_MAIN = "anchor_final_main"
+SETTLEMENT_ALT = "adjacent_literal_sensitivity"
+SETTLEMENT_MODES = (SETTLEMENT_MAIN, SETTLEMENT_ALT)
+
+SENSITIVITY_OUTPUT_DIR = ROOT / "output" / "q3_sensitivity"
+SENSITIVITY_FIG_DIR = ROOT / "fig" / "q3_sensitivity"
+
+YEAR_N_DAYS = 365
+YEAR_END_SOC_A_KWH = 1200.0
+YEAR_END_SOC_B_KWH = 6000.0
+YEAR_END_BOUNDARY_A = "A_q2_aligned"
+YEAR_END_BOUNDARY_B = "B_energy_neutral"
+YEAR_END_BOUNDARIES = (
+    (YEAR_END_BOUNDARY_A, YEAR_END_SOC_A_KWH),
+    (YEAR_END_BOUNDARY_B, YEAR_END_SOC_B_KWH),
+)
+TERMINAL_SOC_PILOT_START = "2025-12-01"
+TERMINAL_SOC_PILOT_END = "2025-12-31"
+TERMINAL_SOC_OUTPUT_DIR = ROOT / "output" / "q3_terminal_soc_pilot"
+TERMINAL_SOC_FIG_DIR = ROOT / "fig" / "q3_terminal_soc_pilot"
+ANNUAL_OUTPUT_DIR = ROOT / "output" / "q3_full_annual"
+ANNUAL_FIG_DIR = ROOT / "fig" / "q3_full_annual"
+ANNUAL_START = "2025-01-01"
+ANNUAL_END = "2025-12-31"
+RESULT3_EXPORT_START = "2025-02-01"
+RESULT3_EXPORT_END = "2025-12-31"
+RESULT3_EXPORT_N_DAYS = 334
+RESULT3_OFFICIAL_STRATEGY = "M1_M6"
+RESULT3_ANNUAL_COST_YUAN = 16373508.75
+FOUR_HOUR_BLOCKS = (
+    ("0:00-4:00", 0, 24),
+    ("4:00-8:00", 24, 48),
+    ("8:00-12:00", 48, 72),
+    ("12:00-16:00", 72, 96),
+    ("16:00-20:00", 96, 120),
+    ("20:00-24:00", 120, 144),
+)
+REQUIRED_TRAJECTORY_COLS = (
+    "date",
+    "period_index",
+    "time_label",
+    "g0_kwh",
+    "g_final_kwh",
+    "x_kwh",
+    "emergency_kwh",
+    "charge_kwh",
+    "discharge_kwh",
+    "curtailment_kwh",
+    "soc_start_kwh",
+    "soc_end_kwh",
+    "actual_load_kwh",
+    "actual_pv_kwh",
+    "locked_or_mutable",
+    "last_update_time",
+)
+
+
+def year_end_tag(year_end_soc_kwh: float | None) -> str:
+    if year_end_soc_kwh is None:
+        return ""
+    return f"ye{int(round(float(year_end_soc_kwh)))}"
+
+
+def year_end_boundary_label(year_end_soc_kwh: float | None) -> str | None:
+    if year_end_soc_kwh is None:
+        return None
+    value = float(year_end_soc_kwh)
+    if abs(value - YEAR_END_SOC_A_KWH) <= 1e-9:
+        return YEAR_END_BOUNDARY_A
+    if abs(value - YEAR_END_SOC_B_KWH) <= 1e-9:
+        return YEAR_END_BOUNDARY_B
+    return f"custom_{value:.0f}"
+
+
+def today_year_end_soc(
+    day_index: int, n_days: int, year_end_soc_kwh: float | None
+) -> float | None:
+    """Hard E_144 target for remaining-horizon LPs on the calendar year's last day."""
+    if year_end_soc_kwh is None:
+        return None
+    if int(day_index) == int(n_days) - 1:
+        return float(year_end_soc_kwh)
+    return None
+
+
+def next_day_year_end_soc(
+    day_index: int, n_days: int, year_end_soc_kwh: float | None
+) -> float | None:
+    """Hard E_144 target for the virtual next-day LP on Dec 30 (48h cost-to-go)."""
+    if year_end_soc_kwh is None:
+        return None
+    if int(day_index) == int(n_days) - 2:
+        return float(year_end_soc_kwh)
+    return None
+
+
+def make_run_id(
+    date: str,
+    strategy: str,
+    load_information_case: str,
+    pv_mapping_mode: str,
+    settlement_mode: str,
+    with_terminal_value: bool,
+    year_end_soc_kwh: float | None = None,
+) -> str:
+    tv = "48h" if with_terminal_value else "no48h"
+    run_id = (
+        f"{date}__{strategy}__{load_information_case}__"
+        f"{pv_mapping_mode}__{settlement_mode}__{tv}"
+    )
+    tag = year_end_tag(year_end_soc_kwh)
+    if tag:
+        run_id += f"__{tag}"
+    return run_id
+
+
+def dispatch_stem(
+    date: str,
+    strategy: str,
+    load_information_case: str,
+    pv_mapping_mode: str,
+    settlement_mode: str,
+    with_terminal_value: bool,
+    year_end_soc_kwh: float | None = None,
+) -> str:
+    suffix = f"{strategy}_{load_information_case}_{pv_mapping_mode}_{settlement_mode}"
+    if not with_terminal_value:
+        suffix += "_no48h"
+    tag = year_end_tag(year_end_soc_kwh)
+    if tag:
+        suffix += f"_{tag}"
+    return f"q3_dispatch_{date}_{suffix}"
 
 # Update clock hours and the first 10-minute index that may change.
 # Index t corresponds to the period ending at (t+1)*10 minutes after 0:00.
