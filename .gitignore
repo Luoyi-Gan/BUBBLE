@@ -36,6 +36,7 @@ data/raw/*
 *.zip
 *.rar
 *.7z
+output/q2_policy_consistent/dispatch_daily/
 
 # Jupyter / plots caches
 .mypy_cache/
@@ -44,3 +45,5 @@ output/q2_full_linked/dispatch_daily/
 output/q2_full_linked/forecast_archive.csv
 output/q2_full_k8_risk/dispatch_daily/
 output/q2_full_k8_risk/forecast_archive.csv
+output/q3_full_annual/dispatch_daily/
+output/q3_full_annual/ledger_raw/

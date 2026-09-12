@@ -1,0 +1,24 @@
+% !TeX program = xelatex
+% Main document for the complete project; edit content in sections/ only.
+\input{preamble}
+\begin{document}
+\reviewtitle{微网与外部电网电力调控策略}
+\ifDraftNotes
+\begin{center}\small 写作整合稿：已纳入问题一正文与四问重述，其余部分按审核进度接入。\end{center}
+\fi
+\ifFinalPartsReady\input{sections/00_abstract}\fi
+\input{sections/01_problem_restatement}
+\input{sections/02_assumptions}
+\input{sections/03_notation}
+\input{sections/04_analysis}
+\input{sections/05_models}
+\ifFinalPartsReady
+\input{sections/06_evaluation}
+\else
+\section{模型的评价、改进与推广}
+\pendingnote{在四问结果完成后，统一撰写模型优点、不足、改进与推广。问题一现有检验保留在其结果分析中。}
+\fi
+\input{sections/07_references}
+\input{sections/08_appendix}
+\ifFinalPartsReady\input{sections/09_ai_statement}\fi
+\end{document}

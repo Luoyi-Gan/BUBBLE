@@ -54,8 +54,8 @@ def main() -> None:
 
     data = load_q2_data()
     archives = {mode: build_forecast_archive_mode(data, mode) for mode in FORECAST_MODES}
-    calibration_rows, diagnostic_rows, deployed_rows = run_rolling_closed_loop_calibration(
-        data, archives, k=FIXED_SCENARIO_K
+    calibration_rows, diagnostic_rows, deployed_rows, cut_stats = run_rolling_closed_loop_calibration(
+        data, archives, k=FIXED_SCENARIO_K, include_value_cuts=True
     )
     calibration = pd.DataFrame(calibration_rows)
     diagnostics = pd.DataFrame(diagnostic_rows)
@@ -87,6 +87,11 @@ def main() -> None:
         "validation_uses_full_day_actual_lp": False,
         "formal_execution_uses_full_day_actual_lp": False,
         "calibration_and_execution_exclude_future_actuals": True,
+        "include_value_cuts": True,
+        "calibration_include_value_cuts": True,
+        "deployment_include_value_cuts": True,
+        "include_value_cuts_consistent": True,
+        "value_cut_cache_entries": int(cut_stats["value_cut_cache_entries"]),
         "annual_run": False,
         "candidate_result2_xlsx": False,
         "k_used_for": ["risk_reserve_R", "intra_day_residual_weights"],
@@ -105,6 +110,8 @@ def main() -> None:
         and diagnostics["selection_role"].eq("diagnostic_only").all()
         and (scored_groups == n_candidates).all()
         and selected.groupby("calibration_date").size().eq(1).all()
+        and calibration["include_value_cuts"].all()
+        and deployed["include_value_cuts"].all()
     )
     report = {
         "status": "PASS" if bool(status) else "FAIL",
@@ -119,6 +126,8 @@ def main() -> None:
         "protected_outputs_unchanged": snapshot_protected() == before,
         "candidate_result2_xlsx": False,
         "mae_is_diagnostic_only": True,
+        "include_value_cuts": True,
+        "include_value_cuts_consistent": True,
     }
     (output / "validation.json").write_text(
         json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
@@ -133,6 +142,7 @@ def main() -> None:
         "一倍标准误内再按未用计划电、m1、较小 α 打破平局。",
         "- MAE / 净负荷 MAE / 覆盖率只写入 `forecast_diagnostics.csv`，不参与选择。",
         "- 每个候选在 14 日窗口内连续传递自己的 SOC；窗口初值取已部署主政策记录的 SOC。",
+        "- 校准评分与获选策略部署均纳入次日基准预测价值割；同一日、同一 (m, α, K) 的割缓存复用。",
         "- 校准与部署均未把验证日未来实际值输入优化问题，也未调用全视域真实路径 LP。",
         "- 未导出候选 result2.xlsx；全年台账、K 敏感性与 2 月初 SOC 敏感性留到 C2-R3。",
         f"- 回退块 {consistency['fallback_blocks']} 个，评分块 {consistency['scored_blocks']} 个。",

@@ -1,0 +1,17 @@
+为给出可复核的成本界，先令储能不可用，则无储能基准成本为：
+\begin{equation}C_0=\sum_{t=1}^{T}p_t\max\{L_t-P_t,0\}.\label{eq:q1-baseline}\end{equation}
+再保留储电量递推、容量、功率与首末状态约束，放松“放电必须由本时段净负荷吸收”等限制，构造最大套利收益上界 $A_{\mathrm{UB}}$。令 $r_t=\max\{P_t-L_t,0\}$ 为可免费用于充电的光伏富余，$b_t$ 为充电所需的最少外购电量，求解：
+\begin{equation}
+\begin{aligned}
+A_{\mathrm{UB}}=\max\quad&\sum_{t=1}^{T}p_t(d_t-b_t),\\
+\text{s.t.}\quad&b_t\ge c_t-r_t,\quad b_t\ge0,\\
+&E_t=E_{t-1}+\eta_c c_t-d_t/\eta_d,\\
+&1200\le E_t\le10800,\quad E_0=E_T=6000,\\
+&0\le c_t,d_t\le5000\Delta t.
+\end{aligned}\label{eq:q1-arbitrage}
+\end{equation}
+该放松模型允许将放电量全部按当期电价计为收益，因而 $A_{\mathrm{UB}}$ 不低于原模型真实套利收益，得到
+\begin{equation}C_{\mathrm{LB}}=\max\{0,C_0-A_{\mathrm{UB}}\}\le C_1^*\le C_0.\label{eq:q1-lowerbound}\end{equation}
+$A_{\mathrm{UB}}$ 只需一次额外 LP 即可计算。对于本问正式 LP，HiGHS 返回 \texttt{optimal}，原始—对偶目标差可作为更紧的数值最优性证书；线性规划的对偶界与最优性关系参见文献\cite{boyd}。
+% Pending: the supplied package has no numerical A_UB / dual objective output.
+% Do not report a numerical lower-bound gap until a matching solver artifact is supplied.

@@ -4,6 +4,7 @@ from dataclasses import replace
 import unittest
 
 import numpy as np
+import pandas as pd
 
 from q2.config import (
     ATTACH1,
@@ -346,6 +347,215 @@ class Q2PolicyConsistentTests(unittest.TestCase):
         selected_near = one_se_tiebreak(near)
         self.assertEqual(selected_near["forecast_mode"], "m1")
         self.assertEqual(selected_near["risk_alpha"], 0.6)
+
+    def test_output_period_splits_january_warmup_from_official_window(self) -> None:
+        from q2.policy_consistent import (
+            PERIOD_FEB_DEC_OUTPUT,
+            PERIOD_JANUARY_WARMUP,
+            output_period,
+        )
+
+        self.assertEqual(output_period("2025-01-01"), PERIOD_JANUARY_WARMUP)
+        self.assertEqual(output_period("2025-01-31"), PERIOD_JANUARY_WARMUP)
+        self.assertEqual(output_period("2025-02-01"), PERIOD_FEB_DEC_OUTPUT)
+        self.assertEqual(output_period("2025-12-31"), PERIOD_FEB_DEC_OUTPUT)
+
+    def test_selected_calendar_is_unique_and_respects_fallback_k(self) -> None:
+        from q2.policy_consistent import selected_calendar_for_dates
+
+        calibration = pd.DataFrame(
+            [
+                {
+                    "selected": True,
+                    "forecast_mode": "m1",
+                    "risk_alpha": np.nan,
+                    "fallback_reason": "insufficient_prior_14_day_window",
+                    "calibration_date": "2025-01-01",
+                    "effective_start_date": "2025-01-01",
+                    "effective_end_date": "2025-01-14",
+                },
+                {
+                    "selected": False,
+                    "forecast_mode": "m2",
+                    "risk_alpha": 0.6,
+                    "fallback_reason": "",
+                    "calibration_date": "2025-01-15",
+                    "effective_start_date": "2025-01-15",
+                    "effective_end_date": "2025-01-28",
+                },
+                {
+                    "selected": True,
+                    "forecast_mode": "m3",
+                    "risk_alpha": 0.6,
+                    "fallback_reason": "",
+                    "calibration_date": "2025-01-15",
+                    "effective_start_date": "2025-01-15",
+                    "effective_end_date": "2025-01-28",
+                },
+            ]
+        )
+        dates = pd.date_range("2025-01-01", "2025-01-16", freq="D")
+        calendar = selected_calendar_for_dates(calibration, dates)
+        self.assertEqual(len(calendar), 16)
+        self.assertEqual(calendar[0].forecast_mode.value, "m1")
+        self.assertIsNone(calendar[0].risk_alpha)
+        self.assertEqual(calendar[0].effective_k(8), 1)
+        self.assertEqual(calendar[13].date, "2025-01-14")
+        self.assertEqual(calendar[14].forecast_mode.value, "m3")
+        self.assertAlmostEqual(calendar[14].risk_alpha, 0.6)
+        self.assertEqual(calendar[14].effective_k(12), 12)
+
+    def test_k_sensitivity_conclusion_retains_k8_when_stable(self) -> None:
+        from q2.policy_consistent import k_sensitivity_conclusion
+
+        stable = [
+            {"scenario_k": 4, "total_cost_yuan": 100.0, "emergency_kwh": 10.0},
+            {"scenario_k": 8, "total_cost_yuan": 101.0, "emergency_kwh": 10.2},
+            {"scenario_k": 12, "total_cost_yuan": 99.5, "emergency_kwh": 9.8},
+        ]
+        self.assertEqual(k_sensitivity_conclusion(stable), "retain_k8_stable")
+        unstable = [
+            {"scenario_k": 4, "total_cost_yuan": 80.0, "emergency_kwh": 5.0},
+            {"scenario_k": 8, "total_cost_yuan": 101.0, "emergency_kwh": 10.2},
+            {"scenario_k": 12, "total_cost_yuan": 99.5, "emergency_kwh": 9.8},
+        ]
+        self.assertEqual(k_sensitivity_conclusion(unstable), "review_k_reselection")
+
+    def test_r2_selected_calendar_covers_the_full_year(self) -> None:
+        from pathlib import Path
+
+        from q2.config import POLICY_CONSISTENT_OUTPUT_DIR
+        from q2.policy_consistent import selected_calendar_for_dates
+
+        path = POLICY_CONSISTENT_OUTPUT_DIR / "closed_loop_calibration.csv"
+        if not path.exists():
+            self.skipTest("C2-R2 calibration artifact missing")
+        calendar = selected_calendar_for_dates(pd.read_csv(path), self.data.dates)
+        self.assertEqual(len(calendar), 365)
+        self.assertEqual(calendar[0].date, "2025-01-01")
+        self.assertEqual(calendar[-1].date, "2025-12-31")
+        self.assertEqual(calendar[0].effective_k(8), 1)
+        self.assertIn(calendar[31].forecast_mode.value, {"m1", "m2", "m3"})
+
+    def test_value_cuts_are_cached_by_day_mode_alpha_and_k(self) -> None:
+        from q2.policy_consistent import (
+            ForecastMode,
+            build_forecast_archive_mode,
+            cached_baseline_value_cuts,
+            value_cut_cache_key,
+        )
+
+        archive = build_forecast_archive_mode(self.data, ForecastMode.M1)
+        cache: dict = {}
+        first = cached_baseline_value_cuts(
+            cache, self.data, archive, 31, ForecastMode.M1, 8, 0.6
+        )
+        second = cached_baseline_value_cuts(
+            cache, self.data, archive, 31, ForecastMode.M1, 8, 0.6
+        )
+        self.assertIs(first[0], second[0])
+        self.assertEqual(len(cache), 1)
+        self.assertIn(value_cut_cache_key(31, ForecastMode.M1, 0.6, 8), cache)
+        other_alpha = cached_baseline_value_cuts(
+            cache, self.data, archive, 31, ForecastMode.M1, 8, 0.7
+        )
+        self.assertEqual(len(cache), 2)
+        self.assertIsNot(first[0], other_alpha[0])
+        other_k = cached_baseline_value_cuts(
+            cache, self.data, archive, 31, ForecastMode.M1, 4, 0.6
+        )
+        self.assertEqual(len(cache), 3)
+        self.assertIsNot(first[0], other_k[0])
+
+    def test_candidate_scoring_uses_cached_value_cuts(self) -> None:
+        from q2.policy_consistent import (
+            ForecastMode,
+            build_forecast_archive_mode,
+            score_one_candidate,
+            value_cut_cache_key,
+        )
+
+        archive = build_forecast_archive_mode(self.data, ForecastMode.M1)
+        cache: dict = {}
+        row = score_one_candidate(
+            self.data,
+            archive,
+            ForecastMode.M1.value,
+            0.6,
+            (31,),
+            6000.0,
+            k=8,
+            include_value_cuts=True,
+            cut_cache=cache,
+        )
+        self.assertTrue(row["include_value_cuts"])
+        self.assertIn(value_cut_cache_key(31, ForecastMode.M1, 0.6, 8), cache)
+        before = len(cache)
+        score_one_candidate(
+            self.data,
+            archive,
+            ForecastMode.M1.value,
+            0.6,
+            (31,),
+            6000.0,
+            k=8,
+            include_value_cuts=True,
+            cut_cache=cache,
+        )
+        self.assertEqual(len(cache), before)
+
+
+class PolicyConsistentR4Tests(unittest.TestCase):
+    def test_emergency_interval_labels_use_slot_start_and_end(self) -> None:
+        from q2.export_result2 import format_emergency_interval
+
+        self.assertEqual(format_emergency_interval(45, 46), "07:30-07:50")
+        self.assertEqual(format_emergency_interval(57, 57), "09:30-09:40")
+        self.assertEqual(format_emergency_interval(0, 0), "00:00-00:10")
+        self.assertEqual(format_emergency_interval(143, 143), "23:50-24:00")
+
+    def test_emergency_segments_keep_all_positive_energy(self) -> None:
+        from q2.export_result2 import emergency_segments
+
+        emergency = np.zeros(144)
+        emergency[45] = 10.786
+        emergency[46] = 2.216
+        emergency[57] = 46.823
+        segments = emergency_segments(emergency)
+        self.assertEqual([(t0, t1) for t0, t1, _amount in segments], [(45, 46), (57, 57)])
+        self.assertAlmostEqual(sum(amount for _t0, _t1, amount in segments), float(emergency.sum()))
+
+    def test_candidate_result2_path_is_isolated_from_signed_off_file(self) -> None:
+        from q2.config import (
+            CANDIDATE_RESULT2,
+            POLICY_CONSISTENT_OUTPUT_DIR,
+            SIGNED_OFF_RESULT2,
+            SIGNED_OFF_RESULT2_SHA256,
+        )
+        from q2.export_result2 import assert_isolated_candidate_path
+
+        self.assertEqual(CANDIDATE_RESULT2.parent, POLICY_CONSISTENT_OUTPUT_DIR)
+        self.assertNotEqual(CANDIDATE_RESULT2.resolve(), SIGNED_OFF_RESULT2.resolve())
+        self.assertEqual(len(SIGNED_OFF_RESULT2_SHA256), 64)
+        with self.assertRaises(RuntimeError):
+            assert_isolated_candidate_path(SIGNED_OFF_RESULT2)
+
+    def test_feb1_charge_blocks_match_dispatch_and_inherited_soc(self) -> None:
+        from q2.config import POLICY_CONSISTENT_OUTPUT_DIR
+        from q2.export_result2 import FOUR_HOUR_BLOCKS, block_energy
+
+        dispatch = POLICY_CONSISTENT_OUTPUT_DIR / "dispatch_daily" / "dispatch_2025-02-01.csv"
+        if not dispatch.exists():
+            self.skipTest("C2-R3 Feb 1 dispatch is not on disk")
+        frame = pd.read_csv(dispatch)
+        charge = block_energy(frame["charge_kwh"].to_numpy(float))
+        self.assertEqual(len(FOUR_HOUR_BLOCKS), 6)
+        self.assertEqual(len(charge), 6)
+        self.assertAlmostEqual(float(charge.sum()), float(frame["charge_kwh"].sum()))
+        ledger = pd.read_csv(POLICY_CONSISTENT_OUTPUT_DIR / "feb_dec_daily_summary.csv").iloc[0]
+        january = pd.read_csv(POLICY_CONSISTENT_OUTPUT_DIR / "january_warmup_summary.csv")
+        self.assertAlmostEqual(float(ledger["soc_start_kwh"]), float(january["soc_end_kwh"].iloc[-1]))
+        self.assertAlmostEqual(float(frame["soc_kwh"].iloc[-1]), float(ledger["soc_end_kwh"]))
 
 
 if __name__ == "__main__":

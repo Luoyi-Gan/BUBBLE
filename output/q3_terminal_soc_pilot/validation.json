@@ -1,0 +1,9 @@
+{
+  "all_pass": true,
+  "failures": [],
+  "n_daily_rows": 310,
+  "n_ledger_rows": 133920,
+  "git_commit": "bee4f4d711a7b79f5e9a765c0d821a4cc59a57ad",
+  "load_treatment": "causal_load_main",
+  "chooses_year_end_boundary": false
+}
