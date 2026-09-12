@@ -1,0 +1,25 @@
+{
+  "interpretation": "Same-day (L, P, p) forecast residuals. Values are Pearson correlations, not causal effects. Residual dates are strictly those with archived causal load, PV, and day-ahead price forecasts.",
+  "n_days": 364,
+  "n_slots": 52416,
+  "first_date": "2025-01-02",
+  "last_date": "2025-12-31",
+  "pearson_flattened_slots": {
+    "load_vs_pv": -0.008038156893876146,
+    "load_vs_price": 0.44172658448229146,
+    "price_vs_pv": -0.3856517712186562
+  },
+  "pearson_daily_mean_residual": {
+    "load_vs_pv": -0.01615675438472386,
+    "load_vs_price": 0.663188265437417,
+    "price_vs_pv": -0.33795011000074526
+  },
+  "residual_std": {
+    "load_kwh": 47.708862341160845,
+    "pv_kwh": 49.33596795735465,
+    "price_yuan_per_kwh": 0.06627654223339045
+  },
+  "scenario_audit_source": "output/q4/q4_2_scenario_audit.csv",
+  "scenario_audit_n_rows": 2876,
+  "scenario_audit_n_days": 363
+}

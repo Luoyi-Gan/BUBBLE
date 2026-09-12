@@ -89,7 +89,7 @@ def configure_style() -> str:
             "axes.titlesize": 12,
             "axes.labelsize": 10,
             "legend.fontsize": 9,
-            "axes.titleweight": "medium",
+            "axes.titleweight": "normal",
             "pdf.fonttype": 42,
         }
     )
@@ -503,11 +503,11 @@ def plot_alpha_timeline(daily: pd.DataFrame) -> dict:
     for row in selected.itertuples():
         start = mdates.date2num(pd.Timestamp(row.effective_start_date).to_pydatetime())
         end = mdates.date2num((pd.Timestamp(row.effective_end_date) + pd.Timedelta(days=1)).to_pydatetime())
-        if row.risk_alpha is None:
+        if pd.isna(row.risk_alpha) or row.kind == "warmup":
             y = y_map[None]
             ax.barh(y, end - start, left=start, height=0.62, color="white", edgecolor=BLACK, linewidth=0.8, hatch="///", zorder=3)
         else:
-            alpha = float(row.risk_alpha)
+            alpha = round(float(row.risk_alpha), 2)
             y = y_map[alpha]
             ax.barh(y, end - start, left=start, height=0.62, color=BLUE, edgecolor=BLUE, linewidth=0.8, zorder=3)
             if alpha == 0.7:

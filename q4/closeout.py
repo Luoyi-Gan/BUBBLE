@@ -31,6 +31,7 @@ from q4.config import (
     EXPORT_N_DAYS,
     EXPORT_START,
     LOAD_INFORMATION_CASE,
+    OUTPUT_DIR,
     Q2_K8_DAILY_CSV,
     Q3_ANNUAL_DAILY_CSV,
     Q4_2_ALPHA_SELECTION_CSV,
@@ -519,7 +520,7 @@ def residual_correlation_report(
             "pv_kwh": float(pv_r.std()),
             "price_yuan_per_kwh": float(price_r.std()),
         },
-        "scenario_audit_source": str(Q4_2_SCENARIO_AUDIT_CSV),
+        "scenario_audit_source": str(Q4_2_SCENARIO_AUDIT_CSV.relative_to(OUTPUT_DIR.parent.parent)),
     }
 
 
