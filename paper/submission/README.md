@@ -23,6 +23,16 @@
 ```bash
 cd paper/overleaf && xelatex -interaction=nonstopmode main.tex && xelatex -interaction=nonstopmode main.tex
 python3 scripts/reconcile_paper_numbers.py   # 期望 50/50
+python3 scripts/build_submission_pack.py     # 生成 submission_pack/CUMCM2026_C题_提交包.zip
 ```
+
+## 竞赛提交（format2026.doc）
+
+| 上传项 | 本仓库对应 | 说明 |
+| --- | --- | --- |
+| 参赛论文 PDF | 提交包内 `参赛论文.pdf` | 单独文件、不压缩；首页为摘要；≤20MB |
+| 支撑材料 | 提交包内 `支撑材料/` | 含代码、题设 result*.xlsx、文件列表 |
+
+打包脚本输出：`submission_pack/CUMCM2026_C题_提交包.zip`（内含上述两项，便于本地备份；网评系统请按须知分别上传 PDF 与支撑材料）。
 
 数字对账：`paper/reconciliation.md`
