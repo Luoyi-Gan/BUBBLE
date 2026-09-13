@@ -37,17 +37,12 @@ TABLE2_DISCHARGE_VAR = "d_t"
 
 ROW_ORDER_POLICY = "attachment_raw_order"
 
-DEFAULT_ATTACH1 = Path(
-    os.environ.get(
-        "CUMCM_C_ATTACH1",
-        "/Users/louis/Desktop/CUMCM2026Problems/C题/附件/附件1.xlsx",
-    )
+DEFAULT_ATTACH_DIR = Path(
+    os.environ.get("CUMCM_C_ATTACH_DIR", ROOT / "data" / "raw" / "附件")
 )
+DEFAULT_ATTACH1 = Path(os.environ.get("CUMCM_C_ATTACH1", DEFAULT_ATTACH_DIR / "附件1.xlsx"))
 DEFAULT_RESULT1_TEMPLATE = Path(
-    os.environ.get(
-        "CUMCM_C_RESULT1_TEMPLATE",
-        "/Users/louis/Desktop/CUMCM2026Problems/C题/附件/附件5/result1.xlsx",
-    )
+    os.environ.get("CUMCM_C_RESULT1_TEMPLATE", DEFAULT_ATTACH_DIR / "附件5" / "result1.xlsx")
 )
 
 OUTPUT_DIR = ROOT / "output"

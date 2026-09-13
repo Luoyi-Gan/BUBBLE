@@ -8,9 +8,7 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
-ATTACH_DIR = Path(
-    os.environ.get("CUMCM_C_ATTACH_DIR", "/Users/louis/Desktop/CUMCM2026Problems/C题/附件")
-)
+ATTACH_DIR = Path(os.environ.get("CUMCM_C_ATTACH_DIR", ROOT / "data" / "raw" / "附件"))
 ATTACH1 = ATTACH_DIR / "附件1.xlsx"
 ATTACH2 = ATTACH_DIR / "附件2.xlsx"
 OUTPUT_DIR = ROOT / "output" / "q2_pilot"

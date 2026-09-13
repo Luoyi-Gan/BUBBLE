@@ -17,8 +17,6 @@ def resolve_attach_dir() -> Path:
         candidates.append(Path(env))
     candidates.extend(
         [
-            Path("/Users/louis/Desktop/CUMCM2026Problems/C题/附件"),
-            ROOT / "data" / "raw",
             ROOT / "data" / "raw" / "附件",
         ]
     )

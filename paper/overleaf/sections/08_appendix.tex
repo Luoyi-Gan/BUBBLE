@@ -3,3 +3,15 @@
 \addcontentsline{toc}{section}{附录 A：问题一完整计划购电量}
 下表按题目附件模板既有行序列出 144 个时段的计划购电量，单位为 kWh。时段标签保留原样，完整精度结果见随附的正式结果工作簿。
 \input{tables/q1/plan_appendix}
+
+\clearpage
+\section*{附录 B\quad 支撑材料文件清单}
+\addcontentsline{toc}{section}{附录 B：支撑材料文件清单}
+支撑材料压缩包不包含题设原始附件；运行时按 \texttt{README.txt} 将题设附件置于约定路径。其余文件均为复算正文结果所需的程序、依赖说明、正式结果工作簿和 AI 工具使用详情。
+\input{tables/supporting_materials_list}
+
+\clearpage
+\section*{附录 C\quad 建模程序代码}
+\addcontentsline{toc}{section}{附录 C：建模程序代码}
+下列代码列出正式计算所需的核心源文件，并与支撑材料压缩包中的 \texttt{q1/}--\texttt{q4/} 目录保持一致；压缩包保留原目录结构，便于按 \texttt{README.txt} 运行。
+\lstinputlisting[language=Python,basicstyle=\ttfamily\scriptsize]{appendix_code/model_source_listing.py}
