@@ -1,11 +1,9 @@
 \section{问题重述}
-\subsection{问题背景}
-\input{sections/restatement/background}
-\subsection{问题一的要求}
-\input{sections/restatement/q1}
-\subsection{问题二的要求}
-\input{sections/restatement/q2}
-\subsection{问题三的要求}
-\input{sections/restatement/q3}
-\subsection{问题四的要求}
-\input{sections/restatement/q4}
+微网由负荷、光伏、储能和外部电网组成。光伏与负荷的时变失配可由储能跨时转移，剩余缺口由外网补足；因此需要在供电、设备和市场规则约束下，联动日前承诺、日内控制与实际结算。
+
+\begin{enumerate}[label=\textbf{Q\arabic*:},leftmargin=3.0em,labelsep=0.4em,itemsep=0.28em]
+\item \textbf{确定性日前基准。}按原始顺序对 144 个 10 分钟时段优化外网购电与储能充放电，在能量平衡、功率、SOC 和首末 SOC 一致约束下最小化购电费，并按模板汇总购电与六个四小时区间的储能结果。
+\item \textbf{全年不确定运行。}每天 0:00 仅凭已知信息锁定普通购电额度；日内据实际负荷、光伏和 SOC 滚动执行。缺口以 5 倍电价紧急购电，要求 SOC 跨日连续、决策不读取未来实际数据，并导出计划、执行和紧急购电记录。
+\item \textbf{多时点预报更新。}在 0:00、6:00、12:00、18:00 接收未来 24 小时光伏预报，允许调整未执行购电承诺；下调部分按 50\% 电价付约、上调部分按 1.5 倍电价计费，同时计入紧急购电，导出完整策略并判断更新是否值得执行。
+\item \textbf{波动电价扩展。}在实际分时电价下，分别重算 Q2 的日前额度策略和 Q3 的多时点调整策略，保持原结果模板并输出 \texttt{result4-2.xlsx}、\texttt{result4-3.xlsx}。
+\end{enumerate}
