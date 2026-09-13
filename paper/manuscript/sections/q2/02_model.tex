@@ -12,13 +12,17 @@ R_{d,t}(\alpha)=\max\left\{0,Q_{\alpha,\pi}\left(r^N_{d,t,1},\ldots,r^N_{d,t,K}\
 \label{eq:q2-reserve}
 \end{equation}
 日前层只在唯一基准预测轨迹上生成 $q$，并求解
-\begin{align}
-\min\quad &\sum_{t=1}^{T}\left(p_tq_{d,t}+5p_te_{d,t}\right)+V_{d+1}(E_{d,T}),\label{eq:q2-objective}\\
-\text{s.t.}\quad &q_{d,t}\ge R_{d,t}(\alpha),\quad 0\le x_{d,t}\le q_{d,t},\nonumber\\
-&x_{d,t}+e_{d,t}+\widehat P_{d,t}-w_{d,t}+r_{d,t}=\widehat L_{d,t}+c_{d,t},\label{eq:q2-balance}\\
-&E_{d,t}=E_{d,t-1}+\eta_cc_{d,t}-r_{d,t}/\eta_d.\label{eq:q2-soc}
-\end{align}
-式中 $c,r,w,E$ 分别为公共母线侧充电、放电、弃光和时段末储电量；它们满足问题一相同的功率、SOC 与弃光边界，且 $\eta_c=\eta_d=\sqrt{0.9}$。$V_{d+1}(\cdot)$ 为按次日因果预测构造的 $48$ 小时终端价值项，只衡量日末能量的机会成本，不提前计入下一日账单。
+\begin{alignat}{2}
+\min\quad &\sum_{t=1}^{T}\left(p_tq_{d,t}+5p_te_{d,t}\right)+V_{d+1}(E_{d,T}), &&\label{eq:q2-objective}\\
+\text{s.t.}\quad q_{d,t}&\ge R_{d,t}(\alpha), &&\quad t=1,\ldots,T,\nonumber\\[-2pt]
+0&\le x_{d,t}\le q_{d,t}, &&\quad t=1,\ldots,T,\nonumber\\[-2pt]
+x_{d,t}+e_{d,t}+\widehat P_{d,t}-w_{d,t}+r_{d,t}&=\widehat L_{d,t}+c_{d,t}, &&\quad t=1,\ldots,T,\label{eq:q2-balance}\\
+E_{d,t}&=E_{d,t-1}+\eta_cc_{d,t}-r_{d,t}/\eta_d, &&\quad t=1,\ldots,T,\label{eq:q2-soc}\\
+0&\le c_{d,t},r_{d,t}\le5000\Delta t, &&\quad t=1,\ldots,T,\nonumber\\[-2pt]
+0&\le w_{d,t}\le\widehat P_{d,t},\quad 0\le e_{d,t}, &&\quad t=1,\ldots,T,\nonumber\\[-2pt]
+1200&\le E_{d,t}\le10800, &&\quad \eta_c=\eta_d=\sqrt{0.9}.\nonumber
+\end{alignat}
+式中 $c,r,w,E$ 分别为公共母线侧充电、放电、弃光和时段末储电量。$V_{d+1}(\cdot)$ 为按次日因果预测构造的 $48$ 小时终端价值项，只衡量日末能量的机会成本，不提前计入下一日账单。
 
 在日内执行时，$q_{d,t}$ 保持不变。到时段 $t$ 为止已观测的残差前缀与每条 medoid 前缀比较，得到后验权重 $\widetilde\pi_{k,t}$；未来预测取对应残差的加权均值，当前时段以实际 $L_{d,t},P_{d,t}$ 闭合能量平衡。控制器仅执行滚动 LP 的第一步，下一时段再用更新后的 SOC 重算。这一非前瞻性限制使日前代表轨迹仅承担计划评估和预测修正功能，而不是可直接执行的完整调度方案。
 
